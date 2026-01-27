@@ -1,0 +1,1152 @@
+openapi: 3.0.3
+info:
+  title: Ad Copy Dashboard API
+  description: |
+    건강기능식품 광고 원고 자동화 시스템 API
+
+    이 API는 건강기능식품의 광고 원고를 관리하고 AI를 통해 자동 생성하는 기능을 제공합니다.
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server
+
+tags:
+  - name: Products
+    description: 상품 관리
+  - name: Copy Types
+    description: 원고 유형 관리
+  - name: Generated Copies
+    description: 생성된 원고 관리
+  - name: Checklists
+    description: 체크리스트 매트릭스
+  - name: Best Copies
+    description: 베스트 원고 관리
+  - name: AI
+    description: AI 원고 생성
+
+paths:
+  # ============================================
+  # Products API
+  # ============================================
+  /api/products:
+    get:
+      tags:
+        - Products
+      summary: 전체 상품 목록 조회
+      description: 등록된 모든 상품의 목록을 반환합니다.
+      operationId: listProducts
+      responses:
+        '200':
+          description: 상품 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Products
+      summary: 상품 생성
+      description: 새로운 상품을 등록합니다.
+      operationId: createProduct
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCreate'
+      responses:
+        '201':
+          description: 상품 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/products/{id}:
+    get:
+      tags:
+        - Products
+      summary: 상품 상세 조회
+      description: 특정 상품의 상세 정보를 반환합니다.
+      operationId: getProduct
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '200':
+          description: 상품 상세 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      tags:
+        - Products
+      summary: 상품 수정
+      description: 기존 상품 정보를 수정합니다.
+      operationId: updateProduct
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductUpdate'
+      responses:
+        '200':
+          description: 상품 수정 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Products
+      summary: 상품 삭제
+      description: 특정 상품을 삭제합니다.
+      operationId: deleteProduct
+      parameters:
+        - $ref: '#/components/parameters/ProductId'
+      responses:
+        '204':
+          description: 상품 삭제 성공
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ============================================
+  # Copy Types API
+  # ============================================
+  /api/copy-types:
+    get:
+      tags:
+        - Copy Types
+      summary: 전체 원고 유형 목록 조회
+      description: 등록된 모든 원고 유형의 목록을 반환합니다.
+      operationId: listCopyTypes
+      responses:
+        '200':
+          description: 원고 유형 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CopyType'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Copy Types
+      summary: 원고 유형 생성
+      description: 새로운 원고 유형을 등록합니다.
+      operationId: createCopyType
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CopyTypeCreate'
+      responses:
+        '201':
+          description: 원고 유형 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CopyType'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/copy-types/{id}:
+    get:
+      tags:
+        - Copy Types
+      summary: 원고 유형 상세 조회
+      description: 특정 원고 유형의 상세 정보를 반환합니다.
+      operationId: getCopyType
+      parameters:
+        - $ref: '#/components/parameters/CopyTypeId'
+      responses:
+        '200':
+          description: 원고 유형 상세 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CopyType'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      tags:
+        - Copy Types
+      summary: 원고 유형 수정
+      description: 기존 원고 유형 정보를 수정합니다.
+      operationId: updateCopyType
+      parameters:
+        - $ref: '#/components/parameters/CopyTypeId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CopyTypeUpdate'
+      responses:
+        '200':
+          description: 원고 유형 수정 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CopyType'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Copy Types
+      summary: 원고 유형 삭제
+      description: 특정 원고 유형을 삭제합니다.
+      operationId: deleteCopyType
+      parameters:
+        - $ref: '#/components/parameters/CopyTypeId'
+      responses:
+        '204':
+          description: 원고 유형 삭제 성공
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ============================================
+  # Generated Copies API
+  # ============================================
+  /api/copies:
+    get:
+      tags:
+        - Generated Copies
+      summary: 원고 목록 조회
+      description: 생성된 원고 목록을 조회합니다. 상품 ID 또는 원고 유형 ID로 필터링할 수 있습니다.
+      operationId: listCopies
+      parameters:
+        - name: product_id
+          in: query
+          description: 필터링할 상품 ID
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: copy_type_id
+          in: query
+          description: 필터링할 원고 유형 ID
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: 원고 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/GeneratedCopy'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Generated Copies
+      summary: 원고 수동 생성
+      description: 새로운 원고를 수동으로 등록합니다.
+      operationId: createCopy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GeneratedCopyCreate'
+      responses:
+        '201':
+          description: 원고 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneratedCopy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/copies/{id}:
+    get:
+      tags:
+        - Generated Copies
+      summary: 원고 상세 조회
+      description: 특정 원고의 상세 정보를 반환합니다.
+      operationId: getCopy
+      parameters:
+        - $ref: '#/components/parameters/CopyId'
+      responses:
+        '200':
+          description: 원고 상세 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneratedCopy'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    put:
+      tags:
+        - Generated Copies
+      summary: 원고 수정
+      description: 기존 원고 내용을 수정합니다.
+      operationId: updateCopy
+      parameters:
+        - $ref: '#/components/parameters/CopyId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GeneratedCopyUpdate'
+      responses:
+        '200':
+          description: 원고 수정 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneratedCopy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags:
+        - Generated Copies
+      summary: 원고 삭제
+      description: 특정 원고를 삭제합니다.
+      operationId: deleteCopy
+      parameters:
+        - $ref: '#/components/parameters/CopyId'
+      responses:
+        '204':
+          description: 원고 삭제 성공
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ============================================
+  # Checklists API
+  # ============================================
+  /api/checklists:
+    get:
+      tags:
+        - Checklists
+      summary: 체크리스트 매트릭스 조회
+      description: 전체 상품 x 원고 유형 매트릭스 형태의 체크리스트를 반환합니다.
+      operationId: listChecklists
+      responses:
+        '200':
+          description: 체크리스트 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Checklist'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/checklists/stats:
+    get:
+      tags:
+        - Checklists
+      summary: 완료율 통계 조회
+      description: 체크리스트의 완료율 통계를 반환합니다.
+      operationId: getChecklistStats
+      responses:
+        '200':
+          description: 통계 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChecklistStats'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/checklists/{id}:
+    put:
+      tags:
+        - Checklists
+      summary: 체크리스트 상태 업데이트
+      description: 특정 체크리스트 항목의 상태를 업데이트합니다.
+      operationId: updateChecklist
+      parameters:
+        - $ref: '#/components/parameters/ChecklistId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChecklistUpdate'
+      responses:
+        '200':
+          description: 체크리스트 업데이트 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Checklist'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ============================================
+  # Best Copies API
+  # ============================================
+  /api/best-copies:
+    get:
+      tags:
+        - Best Copies
+      summary: 베스트 원고 목록 조회
+      description: 베스트로 선정된 원고 목록을 조회합니다. 월별로 필터링할 수 있습니다.
+      operationId: listBestCopies
+      parameters:
+        - name: month
+          in: query
+          description: 필터링할 월 (YYYY-MM 형식)
+          required: false
+          schema:
+            type: string
+            pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+            example: '2025-01'
+      responses:
+        '200':
+          description: 베스트 원고 목록 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BestCopy'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags:
+        - Best Copies
+      summary: 베스트 원고 등록
+      description: 특정 원고를 베스트로 등록합니다.
+      operationId: createBestCopy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BestCopyCreate'
+      responses:
+        '201':
+          description: 베스트 원고 등록 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BestCopy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ============================================
+  # AI API
+  # ============================================
+  /api/ai/generate:
+    post:
+      tags:
+        - AI
+      summary: AI 원고 생성
+      description: AI를 사용하여 특정 상품과 원고 유형에 맞는 광고 원고를 자동 생성합니다.
+      operationId: generateCopy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AIGenerateRequest'
+      responses:
+        '201':
+          description: AI 원고 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneratedCopy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/ai/regenerate/{copy_id}:
+    post:
+      tags:
+        - AI
+      summary: AI 원고 재생성
+      description: 기존 원고를 기반으로 새로운 버전의 원고를 AI로 재생성합니다.
+      operationId: regenerateCopy
+      parameters:
+        - name: copy_id
+          in: path
+          description: 재생성할 원고 ID
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '201':
+          description: AI 원고 재생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GeneratedCopy'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  # ============================================
+  # Parameters
+  # ============================================
+  parameters:
+    ProductId:
+      name: id
+      in: path
+      description: 상품 ID
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    CopyTypeId:
+      name: id
+      in: path
+      description: 원고 유형 ID
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    CopyId:
+      name: id
+      in: path
+      description: 원고 ID
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+    ChecklistId:
+      name: id
+      in: path
+      description: 체크리스트 ID
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  # ============================================
+  # Responses
+  # ============================================
+  responses:
+    BadRequest:
+      description: 잘못된 요청
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Bad Request
+            message: 필수 필드가 누락되었습니다.
+
+    NotFound:
+      description: 리소스를 찾을 수 없음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Not Found
+            message: 요청한 리소스를 찾을 수 없습니다.
+
+    InternalServerError:
+      description: 서버 내부 오류
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Internal Server Error
+            message: 서버에서 오류가 발생했습니다.
+
+  # ============================================
+  # Schemas
+  # ============================================
+  schemas:
+    # ---------- Error ----------
+    Error:
+      type: object
+      required:
+        - error
+        - message
+      properties:
+        error:
+          type: string
+          description: 오류 유형
+        message:
+          type: string
+          description: 오류 상세 메시지
+
+    # ---------- Product ----------
+    Product:
+      type: object
+      required:
+        - id
+        - name
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 상품 고유 식별자
+        name:
+          type: string
+          maxLength: 100
+          description: 상품명
+        usp:
+          type: string
+          nullable: true
+          description: 고유 판매 제안 (Unique Selling Proposition)
+        appeal_points:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: 어필 포인트 목록
+        mechanism:
+          type: string
+          nullable: true
+          description: 작용 메커니즘
+        features:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: 제품 특징 목록
+        english_name:
+          type: string
+          maxLength: 100
+          nullable: true
+          description: 영문 상품명
+        shape:
+          type: string
+          maxLength: 255
+          nullable: true
+          description: 제형
+        herb_keywords:
+          type: array
+          items:
+            type: string
+          nullable: true
+          description: 허브/원료 키워드 목록
+        created_at:
+          type: string
+          format: date-time
+          description: 생성일시
+        updated_at:
+          type: string
+          format: date-time
+          description: 수정일시
+
+    ProductCreate:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          description: 상품명
+        usp:
+          type: string
+          nullable: true
+          description: 고유 판매 제안
+        appeal_points:
+          type: array
+          items:
+            type: string
+          description: 어필 포인트 목록
+        mechanism:
+          type: string
+          nullable: true
+          description: 작용 메커니즘
+        features:
+          type: array
+          items:
+            type: string
+          description: 제품 특징 목록
+        english_name:
+          type: string
+          maxLength: 100
+          nullable: true
+          description: 영문 상품명
+        shape:
+          type: string
+          maxLength: 255
+          nullable: true
+          description: 제형
+        herb_keywords:
+          type: array
+          items:
+            type: string
+          description: 허브/원료 키워드 목록
+
+    ProductUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 100
+          description: 상품명
+        usp:
+          type: string
+          nullable: true
+          description: 고유 판매 제안
+        appeal_points:
+          type: array
+          items:
+            type: string
+          description: 어필 포인트 목록
+        mechanism:
+          type: string
+          nullable: true
+          description: 작용 메커니즘
+        features:
+          type: array
+          items:
+            type: string
+          description: 제품 특징 목록
+        english_name:
+          type: string
+          maxLength: 100
+          nullable: true
+          description: 영문 상품명
+        shape:
+          type: string
+          maxLength: 255
+          nullable: true
+          description: 제형
+        herb_keywords:
+          type: array
+          items:
+            type: string
+          description: 허브/원료 키워드 목록
+
+    # ---------- Copy Type ----------
+    CopyType:
+      type: object
+      required:
+        - id
+        - code
+        - name
+        - created_at
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 원고 유형 고유 식별자
+        code:
+          type: string
+          maxLength: 10
+          description: 원고 유형 코드 (예 A, B, C)
+        name:
+          type: string
+          maxLength: 100
+          description: 원고 유형 명칭
+        description:
+          type: string
+          nullable: true
+          description: 원고 유형 설명
+        core_concept:
+          type: string
+          nullable: true
+          description: 핵심 컨셉
+        example_copy:
+          type: string
+          nullable: true
+          description: 예시 원고
+        prompt_template:
+          type: string
+          nullable: true
+          description: AI 생성용 프롬프트 템플릿
+        created_at:
+          type: string
+          format: date-time
+          description: 생성일시
+        updated_at:
+          type: string
+          format: date-time
+          description: 수정일시
+
+    CopyTypeCreate:
+      type: object
+      required:
+        - code
+        - name
+      properties:
+        code:
+          type: string
+          maxLength: 10
+          description: 원고 유형 코드
+        name:
+          type: string
+          maxLength: 100
+          description: 원고 유형 명칭
+        description:
+          type: string
+          nullable: true
+          description: 원고 유형 설명
+        core_concept:
+          type: string
+          nullable: true
+          description: 핵심 컨셉
+        example_copy:
+          type: string
+          nullable: true
+          description: 예시 원고
+        prompt_template:
+          type: string
+          nullable: true
+          description: AI 생성용 프롬프트 템플릿
+
+    CopyTypeUpdate:
+      type: object
+      properties:
+        code:
+          type: string
+          maxLength: 10
+          description: 원고 유형 코드
+        name:
+          type: string
+          maxLength: 100
+          description: 원고 유형 명칭
+        description:
+          type: string
+          nullable: true
+          description: 원고 유형 설명
+        core_concept:
+          type: string
+          nullable: true
+          description: 핵심 컨셉
+        example_copy:
+          type: string
+          nullable: true
+          description: 예시 원고
+        prompt_template:
+          type: string
+          nullable: true
+          description: AI 생성용 프롬프트 템플릿
+
+    # ---------- Generated Copy ----------
+    GeneratedCopy:
+      type: object
+      required:
+        - id
+        - product_id
+        - copy_type_id
+        - content
+        - version
+        - is_best
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 원고 고유 식별자
+        product_id:
+          type: string
+          format: uuid
+          description: 연결된 상품 ID
+        copy_type_id:
+          type: string
+          format: uuid
+          description: 원고 유형 ID
+        content:
+          type: string
+          description: 원고 내용
+        version:
+          type: integer
+          minimum: 1
+          default: 1
+          description: 버전 번호
+        is_best:
+          type: boolean
+          default: false
+          description: 베스트 원고 여부
+        ad_spend:
+          type: number
+          format: decimal
+          nullable: true
+          description: 광고비 (원)
+        created_at:
+          type: string
+          format: date-time
+          description: 생성일시
+        product:
+          $ref: '#/components/schemas/Product'
+        copy_type:
+          $ref: '#/components/schemas/CopyType'
+
+    GeneratedCopyCreate:
+      type: object
+      required:
+        - product_id
+        - copy_type_id
+        - content
+      properties:
+        product_id:
+          type: string
+          format: uuid
+          description: 연결할 상품 ID
+        copy_type_id:
+          type: string
+          format: uuid
+          description: 원고 유형 ID
+        content:
+          type: string
+          description: 원고 내용
+        ad_spend:
+          type: number
+          format: decimal
+          nullable: true
+          description: 광고비 (원)
+
+    GeneratedCopyUpdate:
+      type: object
+      properties:
+        content:
+          type: string
+          description: 원고 내용
+        is_best:
+          type: boolean
+          description: 베스트 원고 여부
+        ad_spend:
+          type: number
+          format: decimal
+          nullable: true
+          description: 광고비 (원)
+
+    # ---------- Checklist ----------
+    Checklist:
+      type: object
+      required:
+        - id
+        - product_id
+        - copy_type_id
+        - status
+        - updated_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 체크리스트 고유 식별자
+        product_id:
+          type: string
+          format: uuid
+          description: 연결된 상품 ID
+        copy_type_id:
+          type: string
+          format: uuid
+          description: 원고 유형 ID
+        status:
+          type: string
+          enum:
+            - pending
+            - in_progress
+            - completed
+          default: pending
+          description: 작업 상태
+        notes:
+          type: string
+          nullable: true
+          description: 메모
+        updated_at:
+          type: string
+          format: date-time
+          description: 수정일시
+        product:
+          $ref: '#/components/schemas/Product'
+        copy_type:
+          $ref: '#/components/schemas/CopyType'
+
+    ChecklistUpdate:
+      type: object
+      properties:
+        status:
+          type: string
+          enum:
+            - pending
+            - in_progress
+            - completed
+          description: 작업 상태
+        notes:
+          type: string
+          nullable: true
+          description: 메모
+
+    ChecklistStats:
+      type: object
+      required:
+        - total
+        - pending
+        - in_progress
+        - completed
+        - completion_rate
+      properties:
+        total:
+          type: integer
+          minimum: 0
+          description: 전체 항목 수
+        pending:
+          type: integer
+          minimum: 0
+          description: 대기 중 항목 수
+        in_progress:
+          type: integer
+          minimum: 0
+          description: 진행 중 항목 수
+        completed:
+          type: integer
+          minimum: 0
+          description: 완료 항목 수
+        completion_rate:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 100
+          description: 완료율 (퍼센트)
+
+    # ---------- Best Copy ----------
+    BestCopy:
+      type: object
+      required:
+        - id
+        - copy_id
+        - month
+        - ad_spend
+        - created_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: 베스트 원고 고유 식별자
+        copy_id:
+          type: string
+          format: uuid
+          description: 연결된 원고 ID
+        month:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          description: 등록 월 (YYYY-MM 형식)
+          example: '2025-01'
+        ad_spend:
+          type: number
+          format: decimal
+          description: 광고비 (원)
+        created_at:
+          type: string
+          format: date-time
+          description: 생성일시
+        copy:
+          $ref: '#/components/schemas/GeneratedCopy'
+
+    BestCopyCreate:
+      type: object
+      required:
+        - copy_id
+        - month
+        - ad_spend
+      properties:
+        copy_id:
+          type: string
+          format: uuid
+          description: 베스트로 등록할 원고 ID
+        month:
+          type: string
+          pattern: '^\d{4}-(0[1-9]|1[0-2])$'
+          description: 등록 월 (YYYY-MM 형식)
+          example: '2025-01'
+        ad_spend:
+          type: number
+          format: decimal
+          description: 광고비 (원)
+
+    # ---------- AI Request ----------
+    AIGenerateRequest:
+      type: object
+      required:
+        - product_id
+        - copy_type_id
+      properties:
+        product_id:
+          type: string
+          format: uuid
+          description: 원고를 생성할 상품 ID
+        copy_type_id:
+          type: string
+          format: uuid
+          description: 생성할 원고 유형 ID
