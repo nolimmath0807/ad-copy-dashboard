@@ -22,6 +22,7 @@ export function CopyGenerator() {
   const [selectedVariant, setSelectedVariant] = useState<string>('');
   const [generatedCopy, setGeneratedCopy] = useState<GeneratedCopy | null>(null);
   const [loading, setLoading] = useState(false);
+  const [customPrompt, setCustomPrompt] = useState('');
 
   useEffect(() => {
     async function fetchData() {
@@ -51,7 +52,7 @@ export function CopyGenerator() {
     if (!selectedProduct || !selectedVariant) return;
     setLoading(true);
     try {
-      const result = await aiApi.generate(selectedProduct, selectedVariant);
+      const result = await aiApi.generate(selectedProduct, selectedVariant, customPrompt || undefined);
       setGeneratedCopy(result);
     } catch (error) {
       console.error('Failed to generate copy:', error);
@@ -162,6 +163,24 @@ export function CopyGenerator() {
             </CardContent>
           </Card>
         </div>
+
+        {/* 커스텀 프롬프트 */}
+        <Card>
+          <CardHeader>
+            <CardTitle>3. 추가 요청사항 (선택)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              placeholder="추가적인 요청사항을 입력하세요. 예: '문장을 더 짧게 해주세요', '이모지를 추가해주세요', '~한 느낌으로 작성해주세요'"
+              value={customPrompt}
+              onChange={(e) => setCustomPrompt(e.target.value)}
+              className="min-h-[100px]"
+            />
+            <p className="text-sm text-muted-foreground mt-2">
+              입력하지 않아도 기본 프롬프트로 원고가 생성됩니다.
+            </p>
+          </CardContent>
+        </Card>
 
         {/* 생성 버튼 */}
         <Button

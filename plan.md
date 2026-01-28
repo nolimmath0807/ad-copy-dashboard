@@ -1,227 +1,46 @@
-# 광고 원고 자동화 시스템 (Ad Copy Automation Dashboard)
+# Ad-Copy-Dashboard 개선
 
 ## Overview
+체크리스트 UX를 개선하여 1) 신규 상품 추가 시 기본 UTM 코드를 설정할 수 있도록 하고, 2) 주차 표시를 날짜 범위로 변경하여 직관성을 높입니다.
 
-건강기능식품 광고 원고를 자동 생성하고 관리하는 웹 대시보드 시스템입니다. Gemini API를 활용하여 7개+ 유형의 광고 원고를 자동 생성하고, 상품별 원고 운영 현황을 체크리스트로 관리합니다.
+## Key Files
+| File | Action | Description |
+|------|--------|-------------|
+| `frontend/src/pages/Products.tsx` | Modify | 상품 생성/수정 폼에 UTM 코드 필드 추가 |
+| `frontend/src/types/index.ts` | Modify | Product 인터페이스에 default_utm_code 추가 |
+| `frontend/src/lib/api-client.ts` | Modify | ProductCreate에 default_utm_code 추가 |
+| `backend/products/create_product.py` | Modify | default_utm_code 필드 처리 |
+| `backend/products/update_product.py` | Modify | default_utm_code 필드 처리 |
+| `backend/api.py` | Modify | ProductCreate/ProductUpdate 모델에 필드 추가 |
+| `frontend/src/pages/Checklist.tsx` | Modify | 주차 표시를 날짜 범위 형식으로 변경 |
 
-## 핵심 기능
+## Implementation Steps
 
-| 기능 | 설명 |
-|------|------|
-| 상품 관리 | CRUD + 확장 가능 (현재 3개 → 30개+) |
-| 원고 유형 관리 | CRUD + 확장 가능 (현재 7개 → 무제한) |
-| AI 원고 생성 | Gemini API로 상품×유형 조합 자동 생성 |
-| 체크리스트 | 상품×유형 매트릭스 운영 현황 관리 |
-| 베스트 원고 | 광고비 기준 월간 베스트 선정 |
+### Issue 1: 신규상품 UTM 코드 입력 기능
 
-## 기술 스택
+1. **Backend: Product 모델에 default_utm_code 필드 추가**
+   - `backend/api.py`의 ProductCreate, ProductUpdate 모델 수정
+   - `backend/products/create_product.py`, `update_product.py` 수정
+   - Database 스키마에 default_utm_code 컬럼 추가 필요
 
-- **Backend**: Python 3.12 + FastAPI + uv
-- **Database**: Supabase (PostgreSQL)
-- **AI**: Gemini API
-- **Frontend**: React 19 + Vite 7 + TypeScript + Tailwind CSS 4
-- **UI**: shadcn/ui (new-york style)
+2. **Frontend: 상품 폼에 UTM 코드 입력란 추가**
+   - `frontend/src/types/index.ts`에 default_utm_code 추가
+   - `frontend/src/pages/Products.tsx`에 입력 필드 추가
+   - 생성/수정 다이얼로그 모두에 적용
 
-## Database Schema
+### Issue 2: 주차 표시를 날짜 범위로 변경
 
-### products (상품 정보)
-```sql
-CREATE TABLE products (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(100) NOT NULL,
-    usp TEXT,
-    appeal_points TEXT[],
-    mechanism TEXT,
-    features TEXT[],
-    english_name VARCHAR(100),
-    shape VARCHAR(255),
-    herb_keywords TEXT[],
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-```
+3. **Frontend: 주차 → 날짜 범위 변환 함수 추가**
+   - ISO week를 시작일~종료일로 변환하는 유틸리티 함수 작성
+   - 형식: "1월 27일 ~ 2월 2일"
 
-### copy_types (원고 유형 - 확장 가능)
-```sql
-CREATE TABLE copy_types (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code VARCHAR(10) UNIQUE NOT NULL,
-    name VARCHAR(100) NOT NULL,
-    description TEXT,
-    core_concept TEXT,
-    example_copy TEXT,
-    prompt_template TEXT,
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);
-```
+4. **Frontend: Checklist 페이지 UI 수정**
+   - 주차 선택 드롭다운에 날짜 범위 표시
+   - 내부적으로는 YYYY-W## 형식 유지 (API 호환성)
 
-### generated_copies (생성된 원고)
-```sql
-CREATE TABLE generated_copies (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_id UUID REFERENCES products(id) ON DELETE CASCADE,
-    copy_type_id UUID REFERENCES copy_types(id) ON DELETE CASCADE,
-    content TEXT NOT NULL,
-    version INT DEFAULT 1,
-    is_best BOOLEAN DEFAULT FALSE,
-    ad_spend DECIMAL(12,2),
-    created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(product_id, copy_type_id, version)
-);
-```
+## Dependencies
+- 없음 (기존 라이브러리로 충분)
 
-### checklists (체크리스트)
-```sql
-CREATE TABLE checklists (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    product_id UUID REFERENCES products(id) ON DELETE CASCADE,
-    copy_type_id UUID REFERENCES copy_types(id) ON DELETE CASCADE,
-    status VARCHAR(20) DEFAULT 'pending',
-    notes TEXT,
-    updated_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(product_id, copy_type_id)
-);
-```
-
-### best_copies (월간 베스트)
-```sql
-CREATE TABLE best_copies (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    copy_id UUID REFERENCES generated_copies(id) ON DELETE CASCADE,
-    month VARCHAR(7) NOT NULL,
-    ad_spend DECIMAL(12,2) NOT NULL,
-    created_at TIMESTAMP DEFAULT NOW(),
-    UNIQUE(copy_id, month)
-);
-```
-
-## API Endpoints
-
-### Products
-- `GET /api/products` - 전체 상품 목록
-- `GET /api/products/{id}` - 상품 상세
-- `POST /api/products` - 상품 생성
-- `PUT /api/products/{id}` - 상품 수정
-- `DELETE /api/products/{id}` - 상품 삭제
-
-### Copy Types
-- `GET /api/copy-types` - 전체 유형 목록
-- `GET /api/copy-types/{id}` - 유형 상세
-- `POST /api/copy-types` - 유형 생성
-- `PUT /api/copy-types/{id}` - 유형 수정
-- `DELETE /api/copy-types/{id}` - 유형 삭제
-
-### Generated Copies
-- `GET /api/copies` - 원고 목록 (필터 지원)
-- `POST /api/copies/generate` - AI 원고 생성
-- `PUT /api/copies/{id}` - 원고 수정
-- `DELETE /api/copies/{id}` - 원고 삭제
-
-### Checklists
-- `GET /api/checklists` - 체크리스트 매트릭스
-- `GET /api/checklists/stats` - 완료율 통계
-- `PUT /api/checklists/{id}` - 상태 업데이트
-
-### Best Copies
-- `GET /api/best-copies` - 베스트 목록
-- `POST /api/best-copies` - 베스트 등록
-
-### AI
-- `POST /api/ai/generate` - Gemini로 원고 생성
-- `POST /api/ai/regenerate/{id}` - 원고 재생성
-
-## Project Structure
-
-```
-ad-copy-dashboard/
-├── api.yaml
-├── backend/
-│   ├── .env
-│   ├── pyproject.toml
-│   ├── api.py
-│   ├── conn.py
-│   ├── products/
-│   ├── copy_types/
-│   ├── copies/
-│   ├── checklists/
-│   ├── best_copies/
-│   └── ai/
-└── frontend/
-    ├── .env
-    └── src/
-        ├── components/
-        │   ├── ui/
-        │   ├── layout/
-        │   ├── products/
-        │   ├── copy-types/
-        │   ├── copies/
-        │   ├── checklists/
-        │   └── best/
-        ├── pages/
-        ├── lib/
-        └── types/
-```
-
-## Pages
-
-1. **Dashboard** - 통계 + 체크리스트 미리보기 + 최근 원고
-2. **Products** - 상품 CRUD
-3. **CopyTypes** - 원고 유형 CRUD (확장 가능)
-4. **CopyGenerator** - AI 원고 생성
-5. **Checklist** - 상품×유형 매트릭스
-6. **BestCopies** - 월간 베스트 순위
-
-## 초기 데이터
-
-### 상품 (3개)
-- 미스블랙 (MISSBLACK) - 새치유산균
-- 아이틱스 (I-TIX) - 비문증
-- 마그네핏 (Magnetfit) - 관절염
-
-### 원고 유형 (7개, 확장 가능)
-| 코드 | 이름 | 핵심 콘셉트 |
-|------|------|-------------|
-| A | 규제/대법원/단종 공포 | 마지막 고함량 기회 |
-| B | 이익단체 반발/성분 제한 | 업계 로비로 폐기 |
-| C | 역설적 경고/구매 제한 | 효과 너무 세서 금지 |
-| D | 전문가 양심 고백 | 의사가 직접 권함 |
-| E | 임상데이터/환불보장 | 전재산 걸겠다 |
-| F | 타겟별 증상 공감 | 40대 여성 전용 |
-| G | 리얼 후기/결과 중심 | 2주만에 변화 |
-
-## Environment Variables
-
-### Backend (.env)
-```
-SUPABASE_URL=https://uwvldlgnsevnmjprypso.supabase.co
-SUPABASE_KEY=eyJhbGci...
-GEMINI_API_KEY=AIzaSy...
-```
-
-### Frontend (.env)
-```
-VITE_API_URL=http://localhost:8000
-```
-
-## Implementation Phases
-
-### Phase 1: Foundation
-- api.yaml 작성
-- backend/conn.py, ai/gemini_client.py
-- frontend/lib/api-client.ts, types/
-
-### Phase 2: Backend (병렬)
-- products/, copy_types/, copies/, checklists/, best_copies/, ai/
-- api.py 통합
-
-### Phase 3: Frontend (병렬)
-- UI 컴포넌트 (shadcn/ui)
-- Layout 컴포넌트
-- Feature 컴포넌트
-- Pages
-
-### Phase 4: Testing & Deploy
-- 통합 테스트
-- 초기 데이터 입력
-- 배포
+## Risks & Mitigations
+- **DB 스키마 변경**: Supabase에서 products 테이블에 default_utm_code 컬럼 추가 필요
+- **기존 데이터 호환성**: nullable 필드로 추가하여 기존 데이터 영향 없음

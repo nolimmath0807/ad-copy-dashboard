@@ -34,6 +34,7 @@ export function Products() {
     mechanism: '',
     english_name: '',
     shape: '',
+    default_utm_code: '',
   });
 
   useEffect(() => {
@@ -61,7 +62,7 @@ export function Products() {
       }
       setDialogOpen(false);
       setEditingProduct(null);
-      setFormData({ name: '', usp: '', mechanism: '', english_name: '', shape: '' });
+      setFormData({ name: '', usp: '', mechanism: '', english_name: '', shape: '', default_utm_code: '' });
       fetchProducts();
     } catch (error) {
       console.error('Failed to save product:', error);
@@ -86,13 +87,14 @@ export function Products() {
       mechanism: product.mechanism || '',
       english_name: product.english_name || '',
       shape: product.shape || '',
+      default_utm_code: product.default_utm_code || '',
     });
     setDialogOpen(true);
   }
 
   function openCreateDialog() {
     setEditingProduct(null);
-    setFormData({ name: '', usp: '', mechanism: '', english_name: '', shape: '' });
+    setFormData({ name: '', usp: '', mechanism: '', english_name: '', shape: '', default_utm_code: '' });
     setDialogOpen(true);
   }
 
@@ -154,6 +156,15 @@ export function Products() {
                     id="shape"
                     value={formData.shape}
                     onChange={(e) => setFormData({ ...formData, shape: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="default_utm_code">기본 UTM 코드</Label>
+                  <Input
+                    id="default_utm_code"
+                    value={formData.default_utm_code}
+                    onChange={(e) => setFormData({ ...formData, default_utm_code: e.target.value })}
+                    placeholder="예: utm_source=naver&utm_medium=cpc"
                   />
                 </div>
                 <Button type="submit" className="w-full mt-2">

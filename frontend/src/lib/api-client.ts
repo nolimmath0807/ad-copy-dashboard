@@ -79,8 +79,15 @@ export const bestCopiesApi = {
 
 // AI API
 export const aiApi = {
-  generate: (productId: string, copyTypeId: string) =>
-    fetchAPI<GeneratedCopy>('/api/ai/generate', { method: 'POST', body: JSON.stringify({ product_id: productId, copy_type_id: copyTypeId }) }),
+  generate: (productId: string, copyTypeId: string, customPrompt?: string) =>
+    fetchAPI<GeneratedCopy>('/api/ai/generate', {
+      method: 'POST',
+      body: JSON.stringify({
+        product_id: productId,
+        copy_type_id: copyTypeId,
+        custom_prompt: customPrompt || undefined
+      })
+    }),
   regenerate: (copyId: string) =>
     fetchAPI<GeneratedCopy>(`/api/ai/regenerate/${copyId}`, { method: 'POST' }),
 };

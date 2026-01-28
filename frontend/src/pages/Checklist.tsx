@@ -37,6 +37,42 @@ function getRecentWeeks(count: number): string[] {
   return weeks;
 }
 
+// ISO 주차를 날짜 범위 문자열로 변환
+function getWeekDateRange(week: string): string {
+  const [year, w] = week.split('-W');
+  const weekNum = parseInt(w);
+
+  // ISO 주차의 첫 번째 날 (월요일) 계산
+  const jan4 = new Date(parseInt(year), 0, 4);
+  const dayOfWeek = jan4.getDay() || 7;
+  const firstMonday = new Date(jan4);
+  firstMonday.setDate(jan4.getDate() - dayOfWeek + 1);
+
+  // 해당 주차의 월요일
+  const weekStart = new Date(firstMonday);
+  weekStart.setDate(firstMonday.getDate() + (weekNum - 1) * 7);
+
+  // 해당 주차의 일요일
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+
+  // "2026년 1월 27일 ~ 2월 2일" 형식으로 포맷
+  const startYear = weekStart.getFullYear();
+  const startMonth = weekStart.getMonth() + 1;
+  const startDay = weekStart.getDate();
+  const endYear = weekEnd.getFullYear();
+  const endMonth = weekEnd.getMonth() + 1;
+  const endDay = weekEnd.getDate();
+
+  if (startYear === endYear && startMonth === endMonth) {
+    return `${startYear}년 ${startMonth}월 ${startDay}일 ~ ${endDay}일`;
+  }
+  if (startYear === endYear) {
+    return `${startYear}년 ${startMonth}월 ${startDay}일 ~ ${endMonth}월 ${endDay}일`;
+  }
+  return `${startYear}년 ${startMonth}월 ${startDay}일 ~ ${endYear}년 ${endMonth}월 ${endDay}일`;
+}
+
 export function Checklist() {
   const [products, setProducts] = useState<Product[]>([]);
   const [copyTypes, setCopyTypes] = useState<CopyType[]>([]);
@@ -146,12 +182,12 @@ export function Checklist() {
           <CardContent className="pt-6">
             <div className="flex items-center gap-4 mb-4">
               <Select value={selectedWeek} onValueChange={setSelectedWeek}>
-                <SelectTrigger className="w-40">
-                  <SelectValue />
+                <SelectTrigger className="w-64">
+                  <SelectValue>{getWeekDateRange(selectedWeek)}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {recentWeeks.map(week => (
-                    <SelectItem key={week} value={week}>{week}</SelectItem>
+                    <SelectItem key={week} value={week}>{getWeekDateRange(week)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

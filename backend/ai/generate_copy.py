@@ -6,7 +6,7 @@ from conn import get_supabase_client
 from ai.gemini_client import generate_copy as gemini_generate
 
 
-def generate_ad_copy(product_id: str, copy_type_id: str) -> dict:
+def generate_ad_copy(product_id: str, copy_type_id: str, custom_prompt: str = None) -> dict:
     client = get_supabase_client()
 
     product = (
@@ -22,7 +22,7 @@ def generate_ad_copy(product_id: str, copy_type_id: str) -> dict:
         .data
     )
 
-    content = gemini_generate(product, copy_type)
+    content = gemini_generate(product, copy_type, custom_prompt)
 
     existing = (
         client.table("generated_copies")

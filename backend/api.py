@@ -73,6 +73,7 @@ class ProductCreate(BaseModel):
     english_name: Optional[str] = None
     shape: Optional[str] = None
     herb_keywords: Optional[list[str]] = None
+    default_utm_code: Optional[str] = None
 
 
 class ProductUpdate(BaseModel):
@@ -84,6 +85,7 @@ class ProductUpdate(BaseModel):
     english_name: Optional[str] = None
     shape: Optional[str] = None
     herb_keywords: Optional[list[str]] = None
+    default_utm_code: Optional[str] = None
 
 
 # Copy Type Models
@@ -137,6 +139,7 @@ class BestCopyCreate(BaseModel):
 class AIGenerateRequest(BaseModel):
     product_id: str
     copy_type_id: str
+    custom_prompt: Optional[str] = None
 
 
 # ============================================
@@ -300,7 +303,7 @@ def api_create_best_copy(data: BestCopyCreate):
 
 @app.post("/api/ai/generate", status_code=status.HTTP_201_CREATED)
 def api_generate_copy(data: AIGenerateRequest):
-    return generate_ad_copy(data.product_id, data.copy_type_id)
+    return generate_ad_copy(data.product_id, data.copy_type_id, data.custom_prompt)
 
 
 @app.post("/api/ai/regenerate/{copy_id}", status_code=status.HTTP_201_CREATED)

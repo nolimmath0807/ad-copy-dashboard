@@ -40,7 +40,7 @@ COPY_GENERATION_PROMPT = """
 """
 
 
-def generate_copy(product_info: dict, copy_type_info: dict) -> str:
+def generate_copy(product_info: dict, copy_type_info: dict, custom_prompt: str = None) -> str:
     api_key = os.environ["GEMINI_API_KEY"]
 
     client = genai.Client(api_key=api_key)
@@ -53,6 +53,9 @@ def generate_copy(product_info: dict, copy_type_info: dict) -> str:
         shape=product_info.get("shape", ""),
         example_copy=copy_type_info.get("example_copy", ""),
     )
+
+    if custom_prompt:
+        prompt += f"\n\n## 추가 요청사항\n{custom_prompt}"
 
     response = client.models.generate_content(
         model="gemini-2.0-flash",

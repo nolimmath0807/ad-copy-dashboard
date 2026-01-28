@@ -18,32 +18,33 @@ def init_week_checklists(week: str = None):
 
     client = get_supabase_client()
 
-    # 이미 해당 주차 데이터가 있는지 확인
-    existing = client.table("checklists").select("id").eq("week", week).limit(1).execute()
-    if existing.data:
-        print(f"Week {week} already has checklists")
-        return existing.data
-
     # 모든 상품과 유형 조회
     products = client.table("products").select("id").execute().data
     copy_types = client.table("copy_types").select("id").execute().data
 
-    # 새 체크리스트 생성
+    # 기존 체크리스트 조회
+    existing = client.table("checklists").select("product_id, copy_type_id").eq("week", week).execute().data
+    existing_pairs = {(item["product_id"], item["copy_type_id"]) for item in existing}
+
+    # 누락된 조합만 생성
     new_checklists = []
     for product in products:
         for copy_type in copy_types:
-            new_checklists.append({
-                "product_id": product["id"],
-                "copy_type_id": copy_type["id"],
-                "status": "pending",
-                "week": week
-            })
+            pair = (product["id"], copy_type["id"])
+            if pair not in existing_pairs:
+                new_checklists.append({
+                    "product_id": product["id"],
+                    "copy_type_id": copy_type["id"],
+                    "status": "pending",
+                    "week": week
+                })
 
     if new_checklists:
         response = client.table("checklists").insert(new_checklists).execute()
-        print(f"Created {len(response.data)} checklists for week {week}")
+        print(f"Created {len(response.data)} new checklists for week {week}")
         return response.data
 
+    print(f"No new checklists needed for week {week}")
     return []
 
 

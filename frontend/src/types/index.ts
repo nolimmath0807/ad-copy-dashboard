@@ -8,6 +8,7 @@ export interface Product {
   english_name: string | null;
   shape: string | null;
   herb_keywords: string[] | null;
+  default_utm_code: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -21,6 +22,7 @@ export interface ProductCreate {
   english_name?: string;
   shape?: string;
   herb_keywords?: string[];
+  default_utm_code?: string;
 }
 
 export interface ProductUpdate extends Partial<ProductCreate> {}
