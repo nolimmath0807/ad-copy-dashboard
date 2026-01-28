@@ -1,0 +1,16 @@
+[phases.setup]
+nixPkgs = ["nodejs_20", "python312", "uv"]
+
+[phases.install]
+cmds = [
+    "cd frontend && npm install",
+    "cd backend && uv sync"
+]
+
+[phases.build]
+cmds = [
+    "cd frontend && npm run build"
+]
+
+[start]
+cmd = "cd backend && uv run uvicorn api:app --host 0.0.0.0 --port ${PORT:-8000}"
