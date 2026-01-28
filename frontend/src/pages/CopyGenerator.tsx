@@ -156,8 +156,14 @@ export function CopyGenerator() {
               )}
 
               {selectedVariantData && (
-                <div className="text-sm p-4 bg-blue-50 border border-blue-200 rounded-md">
-                  <p><strong>선택된 스타일:</strong> {selectedVariantData.variant_name}</p>
+                <div className="text-sm space-y-2 p-4 bg-blue-50 border border-blue-200 rounded-md">
+                  <p><strong>선택된 스타일:</strong> [{selectedVariantData.code}] {selectedVariantData.variant_name || selectedVariantData.name}</p>
+                  {selectedVariantData.core_concept && (
+                    <p><strong>핵심 콘셉트:</strong> {selectedVariantData.core_concept}</p>
+                  )}
+                  {selectedVariantData.prompt_template && (
+                    <p className="text-muted-foreground"><strong>프롬프트:</strong> {selectedVariantData.prompt_template}</p>
+                  )}
                 </div>
               )}
             </CardContent>

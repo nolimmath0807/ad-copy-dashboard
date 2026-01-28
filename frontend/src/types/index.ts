@@ -121,3 +121,55 @@ export interface BestCopyCreate {
   month: string;
   ad_spend: number;
 }
+
+// Team
+export interface Team {
+  id: string;
+  name: string;
+  created_at: string;
+}
+
+export interface TeamCreate {
+  name: string;
+}
+
+// User
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  team_id: string;
+  team?: Team;
+  is_approved: boolean;
+  is_admin: boolean;
+  created_at: string;
+}
+
+// Auth
+export interface AuthRegister {
+  email: string;
+  password: string;
+  name: string;
+  team_id: string;
+}
+
+export interface AuthLogin {
+  email: string;
+  password: string;
+}
+
+export interface AuthResponse {
+  user: User;
+  session: {
+    access_token: string;
+    refresh_token: string;
+  };
+}
+
+// Team Product
+export interface TeamProduct {
+  id: string;
+  team_id: string;
+  product_id: string;
+  created_at: string;
+}

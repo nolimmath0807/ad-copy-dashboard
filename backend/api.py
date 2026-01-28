@@ -2,7 +2,7 @@ import sys
 import os
 sys.path.insert(0, "/Users/las/Development/project/ad-copy-dashboard/backend")
 
-from fastapi import FastAPI, HTTPException, Response, status
+from fastapi import FastAPI, HTTPException, Response, status, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -44,6 +44,23 @@ from best_copies.create_best import create_best_copy
 # AI
 from ai.generate_copy import generate_ad_copy
 from ai.regenerate_copy import regenerate_copy
+
+# Teams
+from teams.list_teams import list_teams
+from teams.create_team import create_team
+from teams.delete_team import delete_team
+
+# Team Products
+from team_products.list_team_products import list_team_products
+from team_products.create_team_product import create_team_product
+from team_products.delete_team_product import delete_team_product
+
+# Auth
+from auth.register import register_user
+from auth.login import login_user
+from auth.me import get_current_user
+from auth.approve import approve_user
+from auth.list_users import list_users
 
 
 app = FastAPI(
@@ -142,6 +159,30 @@ class AIGenerateRequest(BaseModel):
     product_id: str
     copy_type_id: str
     custom_prompt: Optional[str] = None
+
+
+# Team Models
+class TeamCreate(BaseModel):
+    name: str
+
+
+# Team Product Models
+class TeamProductCreate(BaseModel):
+    team_id: str
+    product_id: str
+
+
+# Auth Models
+class AuthRegister(BaseModel):
+    email: str
+    password: str
+    name: str
+    team_id: str
+
+
+class AuthLogin(BaseModel):
+    email: str
+    password: str
 
 
 # ============================================
@@ -260,8 +301,8 @@ def api_delete_copy(id: str):
 # ============================================
 
 @app.get("/api/checklists")
-def api_list_checklists(week: Optional[str] = None):
-    return list_checklists(week)
+def api_list_checklists(week: Optional[str] = None, team_id: Optional[str] = None):
+    return list_checklists(week, team_id)
 
 
 @app.post("/api/checklists/init-week")
@@ -297,6 +338,78 @@ def api_create_best_copy(data: BestCopyCreate):
         "ad_spend": data.ad_spend,
     }
     return create_best_copy(best_copy_data)
+
+
+# ============================================
+# Teams API
+# ============================================
+
+@app.get("/api/teams")
+def api_list_teams():
+    return list_teams()
+
+
+@app.post("/api/teams", status_code=status.HTTP_201_CREATED)
+def api_create_team(data: TeamCreate):
+    return create_team(data.name)
+
+
+@app.delete("/api/teams/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def api_delete_team(id: str):
+    delete_team(id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ============================================
+# Team Products API
+# ============================================
+
+@app.get("/api/team-products")
+def api_list_team_products(team_id: Optional[str] = None):
+    return list_team_products(team_id)
+
+
+@app.post("/api/team-products", status_code=status.HTTP_201_CREATED)
+def api_create_team_product(data: TeamProductCreate):
+    return create_team_product(data.team_id, data.product_id)
+
+
+@app.delete("/api/team-products/{id}", status_code=status.HTTP_204_NO_CONTENT)
+def api_delete_team_product(id: str):
+    delete_team_product(id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ============================================
+# Auth API
+# ============================================
+
+@app.post("/api/auth/register", status_code=status.HTTP_201_CREATED)
+def api_register(data: AuthRegister):
+    return register_user(data.email, data.password, data.name, data.team_id)
+
+
+@app.post("/api/auth/login")
+def api_login(data: AuthLogin):
+    return login_user(data.email, data.password)
+
+
+@app.get("/api/auth/me")
+def api_get_me(authorization: str = Header(None)):
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid token")
+    token = authorization.replace("Bearer ", "")
+    return get_current_user(token)
+
+
+@app.get("/api/auth/users")
+def api_list_users():
+    return list_users()
+
+
+@app.put("/api/auth/approve/{id}")
+def api_approve_user(id: str):
+    return approve_user(id)
 
 
 # ============================================

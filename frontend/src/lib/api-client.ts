@@ -13,6 +13,13 @@ import type {
   ChecklistStats,
   BestCopy,
   BestCopyCreate,
+  Team,
+  TeamCreate,
+  TeamProduct,
+  User,
+  AuthRegister,
+  AuthLogin,
+  AuthResponse,
 } from '@/types';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -27,6 +34,10 @@ async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> 
   });
   if (!response.ok) {
     throw new Error(`API Error: ${response.status}`);
+  }
+  // 204 No Content 응답 처리
+  if (response.status === 204) {
+    return undefined as T;
   }
   return response.json();
 }
@@ -65,7 +76,12 @@ export const copiesApi = {
 
 // Checklists API
 export const checklistsApi = {
-  list: (week?: string) => fetchAPI<Checklist[]>(`/api/checklists${week ? `?week=${week}` : ''}`),
+  list: (teamId?: string) => {
+    const params = new URLSearchParams();
+    if (teamId) params.append('team_id', teamId);
+    const queryString = params.toString();
+    return fetchAPI<Checklist[]>(`/api/checklists${queryString ? `?${queryString}` : ''}`);
+  },
   stats: () => fetchAPI<ChecklistStats>('/api/checklists/stats'),
   update: (id: string, data: ChecklistUpdate) => fetchAPI<Checklist>(`/api/checklists/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   initWeek: (week?: string) => fetchAPI<Checklist[]>(`/api/checklists/init-week${week ? `?week=${week}` : ''}`, { method: 'POST' }),
@@ -75,6 +91,31 @@ export const checklistsApi = {
 export const bestCopiesApi = {
   list: (month?: string) => fetchAPI<BestCopy[]>(`/api/best-copies${month ? `?month=${month}` : ''}`),
   create: (data: BestCopyCreate) => fetchAPI<BestCopy>('/api/best-copies', { method: 'POST', body: JSON.stringify(data) }),
+};
+
+// Teams API
+export const teamsApi = {
+  list: () => fetchAPI<Team[]>('/api/teams'),
+  create: (data: TeamCreate) => fetchAPI<Team>('/api/teams', { method: 'POST', body: JSON.stringify(data) }),
+  delete: (id: string) => fetchAPI<void>(`/api/teams/${id}`, { method: 'DELETE' }),
+};
+
+// Team Products API
+export const teamProductsApi = {
+  list: (teamId?: string) => fetchAPI<TeamProduct[]>(`/api/team-products${teamId ? `?team_id=${teamId}` : ''}`),
+  create: (teamId: string, productId: string) => fetchAPI<TeamProduct>('/api/team-products', { method: 'POST', body: JSON.stringify({ team_id: teamId, product_id: productId }) }),
+  delete: (id: string) => fetchAPI<void>(`/api/team-products/${id}`, { method: 'DELETE' }),
+};
+
+// Auth API
+export const authApi = {
+  register: (data: AuthRegister) => fetchAPI<User>('/api/auth/register', { method: 'POST', body: JSON.stringify(data) }),
+  login: (data: AuthLogin) => fetchAPI<AuthResponse>('/api/auth/login', { method: 'POST', body: JSON.stringify(data) }),
+  me: (token: string) => fetchAPI<User>('/api/auth/me', {
+    headers: { 'Authorization': `Bearer ${token}` }
+  }),
+  listUsers: () => fetchAPI<User[]>('/api/auth/users'),
+  approve: (id: string) => fetchAPI<User>(`/api/auth/approve/${id}`, { method: 'PUT' }),
 };
 
 // AI API

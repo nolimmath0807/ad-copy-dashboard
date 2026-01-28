@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import {
   Table,
   TableBody,
@@ -20,7 +21,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { productsApi } from '@/lib/api-client';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, X } from 'lucide-react';
 import type { Product, ProductCreate } from '@/types';
 
 export function Products() {
@@ -31,11 +32,13 @@ export function Products() {
   const [formData, setFormData] = useState<ProductCreate>({
     name: '',
     usp: '',
+    appeal_points: [],
     mechanism: '',
     english_name: '',
     shape: '',
     default_utm_code: '',
   });
+  const [newAppealPoint, setNewAppealPoint] = useState('');
 
   useEffect(() => {
     fetchProducts();
@@ -62,7 +65,7 @@ export function Products() {
       }
       setDialogOpen(false);
       setEditingProduct(null);
-      setFormData({ name: '', usp: '', mechanism: '', english_name: '', shape: '', default_utm_code: '' });
+      resetForm();
       fetchProducts();
     } catch (error) {
       console.error('Failed to save product:', error);
@@ -79,23 +82,61 @@ export function Products() {
     }
   }
 
+  function resetForm() {
+    setFormData({
+      name: '',
+      usp: '',
+      appeal_points: [],
+      mechanism: '',
+      english_name: '',
+      shape: '',
+      default_utm_code: '',
+    });
+    setNewAppealPoint('');
+  }
+
   function openEditDialog(product: Product) {
     setEditingProduct(product);
     setFormData({
       name: product.name,
       usp: product.usp || '',
+      appeal_points: product.appeal_points || [],
       mechanism: product.mechanism || '',
       english_name: product.english_name || '',
       shape: product.shape || '',
       default_utm_code: product.default_utm_code || '',
     });
+    setNewAppealPoint('');
     setDialogOpen(true);
   }
 
   function openCreateDialog() {
     setEditingProduct(null);
-    setFormData({ name: '', usp: '', mechanism: '', english_name: '', shape: '', default_utm_code: '' });
+    resetForm();
     setDialogOpen(true);
+  }
+
+  function addAppealPoint() {
+    if (!newAppealPoint.trim()) return;
+    setFormData({
+      ...formData,
+      appeal_points: [...(formData.appeal_points || []), newAppealPoint.trim()],
+    });
+    setNewAppealPoint('');
+  }
+
+  function removeAppealPoint(index: number) {
+    setFormData({
+      ...formData,
+      appeal_points: (formData.appeal_points || []).filter((_, i) => i !== index),
+    });
+  }
+
+  function handleAppealPointKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addAppealPoint();
+    }
   }
 
   return (
@@ -110,7 +151,7 @@ export function Products() {
                 <Plus className="mr-2 h-4 w-4" /> 새 상품
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl">
+            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{editingProduct ? '상품 수정' : '새 상품 등록'}</DialogTitle>
               </DialogHeader>
@@ -135,12 +176,44 @@ export function Products() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="usp">USP</Label>
+                  <Label htmlFor="usp">핵심 USP (한 줄 요약)</Label>
                   <Textarea
                     id="usp"
                     value={formData.usp}
                     onChange={(e) => setFormData({ ...formData, usp: e.target.value })}
+                    placeholder="예: 먹기만 해도 염색없이 머리가 뿌리부터 까맣게 나는 영양제"
+                    rows={2}
                   />
+                </div>
+                <div className="space-y-2">
+                  <Label>소구점 (복수 입력 가능)</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={newAppealPoint}
+                      onChange={(e) => setNewAppealPoint(e.target.value)}
+                      onKeyDown={handleAppealPointKeyDown}
+                      placeholder="소구점 입력 후 Enter 또는 추가 버튼"
+                    />
+                    <Button type="button" variant="outline" onClick={addAppealPoint}>
+                      추가
+                    </Button>
+                  </div>
+                  {(formData.appeal_points || []).length > 0 && (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {(formData.appeal_points || []).map((point, index) => (
+                        <Badge key={index} variant="secondary" className="px-3 py-1 text-sm">
+                          {point}
+                          <button
+                            type="button"
+                            onClick={() => removeAppealPoint(index)}
+                            className="ml-2 hover:text-destructive"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="mechanism">기전</Label>
@@ -148,6 +221,7 @@ export function Products() {
                     id="mechanism"
                     value={formData.mechanism}
                     onChange={(e) => setFormData({ ...formData, mechanism: e.target.value })}
+                    rows={3}
                   />
                 </div>
                 <div className="space-y-2">
@@ -185,7 +259,8 @@ export function Products() {
                 <TableRow>
                   <TableHead>품명</TableHead>
                   <TableHead>영문명</TableHead>
-                  <TableHead>USP</TableHead>
+                  <TableHead>핵심 USP</TableHead>
+                  <TableHead>소구점</TableHead>
                   <TableHead className="w-24">액션</TableHead>
                 </TableRow>
               </TableHeader>
@@ -195,6 +270,20 @@ export function Products() {
                     <TableCell className="font-medium">{product.name}</TableCell>
                     <TableCell>{product.english_name}</TableCell>
                     <TableCell className="max-w-xs truncate">{product.usp}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        {(product.appeal_points || []).slice(0, 2).map((point, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            {point.length > 15 ? point.slice(0, 15) + '...' : point}
+                          </Badge>
+                        ))}
+                        {(product.appeal_points || []).length > 2 && (
+                          <Badge variant="outline" className="text-xs">
+                            +{(product.appeal_points || []).length - 2}
+                          </Badge>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button variant="ghost" size="icon" onClick={() => openEditDialog(product)}>
