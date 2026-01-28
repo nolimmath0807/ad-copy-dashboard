@@ -1,6 +1,6 @@
 import sys
 import os
-sys.path.insert(0, "/Users/las/Development/project/ad-copy-dashboard/backend")
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from fastapi import FastAPI, HTTPException, Response, status, Header
 from fastapi.middleware.cors import CORSMiddleware
