@@ -7,7 +7,7 @@ from conn import get_supabase_client
 
 def list_copies(product_id: str = None, copy_type_id: str = None):
     client = get_supabase_client()
-    query = client.table("generated_copies").select("*, products(*), copy_types(*)")
+    query = client.table("copies").select("*, products(*), copy_types(*)")
     if product_id:
         query = query.eq("product_id", product_id)
     if copy_type_id:

@@ -24,24 +24,12 @@ def generate_ad_copy(product_id: str, copy_type_id: str, custom_prompt: str = No
 
     content = gemini_generate(product, copy_type, custom_prompt)
 
-    existing = (
-        client.table("generated_copies")
-        .select("version")
-        .eq("product_id", product_id)
-        .eq("copy_type_id", copy_type_id)
-        .order("version", desc=True)
-        .limit(1)
-        .execute()
-    )
-    version = (existing.data[0]["version"] + 1) if existing.data else 1
-
     new_copy = {
         "product_id": product_id,
         "copy_type_id": copy_type_id,
         "content": content,
-        "version": version,
     }
-    response = client.table("generated_copies").insert(new_copy).execute()
+    response = client.table("copies").insert(new_copy).execute()
     return response.data[0]
 
 

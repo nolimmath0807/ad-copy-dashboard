@@ -7,7 +7,7 @@ from conn import get_supabase_client
 
 def get_copy(copy_id: str):
     client = get_supabase_client()
-    response = client.table("generated_copies").select("*, products(*), copy_types(*)").eq("id", copy_id).single().execute()
+    response = client.table("copies").select("*, products(*), copy_types(*)").eq("id", copy_id).single().execute()
     return response.data
 
 

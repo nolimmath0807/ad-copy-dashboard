@@ -7,7 +7,7 @@ from conn import get_supabase_client
 
 def delete_copy(copy_id: str):
     client = get_supabase_client()
-    client.table("generated_copies").delete().eq("id", copy_id).execute()
+    client.table("copies").delete().eq("id", copy_id).execute()
     return {"success": True}
 
 

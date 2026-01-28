@@ -8,7 +8,7 @@ from conn import get_supabase_client
 def list_best_copies(month: str = None) -> list:
     client = get_supabase_client()
     query = client.table("best_copies").select(
-        "*, generated_copies(*, products(*), copy_types(*))"
+        "*, copies(*, products(*), copy_types(*))"
     )
     if month:
         query = query.eq("month", month)

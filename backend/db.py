@@ -61,6 +61,7 @@ class QueryBuilder:
         self._order_by = None
         self._order_desc = False
         self._limit = None
+        self._single = False
         self._operation = "select"
         self._insert_data = None
         self._update_data = None
@@ -134,6 +135,7 @@ class QueryBuilder:
 
     def single(self):
         self._limit = 1
+        self._single = True
         return self
 
     def execute(self):
@@ -195,7 +197,10 @@ class QueryBuilder:
                             for r in results:
                                 r[key_name] = None
 
-                    return QueryResult(results)
+                    result = QueryResult(results)
+                    if self._single:
+                        result.data = result.data[0] if result.data else None
+                    return result
                 else:
                     sql = f'SELECT {self._select_cols} FROM "{self.table_name}"'
                     if self._where_clauses:
@@ -209,7 +214,10 @@ class QueryBuilder:
 
                     cur.execute(sql, self._where_values)
                     rows = cur.fetchall()
-                    return QueryResult([dict(row) for row in rows])
+                    result = QueryResult([dict(row) for row in rows])
+                    if self._single:
+                        result.data = result.data[0] if result.data else None
+                    return result
 
             elif self._operation == "insert":
                 if isinstance(self._insert_data, list):

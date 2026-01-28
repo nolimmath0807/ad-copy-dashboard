@@ -8,7 +8,7 @@ from conn import get_supabase_client
 
 def update_copy(copy_id: str, data: dict):
     client = get_supabase_client()
-    response = client.table("generated_copies").update(data).eq("id", copy_id).execute()
+    response = client.table("copies").update(data).eq("id", copy_id).execute()
     return response.data[0]
 
 

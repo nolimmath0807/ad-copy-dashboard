@@ -8,7 +8,7 @@ from conn import get_supabase_client
 
 def create_copy(data: dict):
     client = get_supabase_client()
-    response = client.table("generated_copies").insert(data).execute()
+    response = client.table("copies").insert(data).execute()
     return response.data[0]
 
 

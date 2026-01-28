@@ -10,7 +10,7 @@ def regenerate_copy(copy_id: str) -> dict:
     client = get_supabase_client()
 
     existing = (
-        client.table("generated_copies")
+        client.table("copies")
         .select("product_id, copy_type_id")
         .eq("id", copy_id)
         .single()
