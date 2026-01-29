@@ -3,11 +3,11 @@ import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { checklistsApi, teamsApi, teamProductsApi } from '@/lib/api-client';
+import { checklistsApi, teamsApi, teamProductsApi, adPerformanceApi } from '@/lib/api-client';
 import { Download } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import * as XLSX from 'xlsx';
-import type { Checklist, Team, TeamProduct } from '@/types';
+import type { Checklist, Team, TeamProduct, WeeklyPerformance } from '@/types';
 
 const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#0088fe', '#00C49F'];
 
@@ -74,6 +74,8 @@ export default function AdminReport() {
   const [checklists, setChecklists] = useState<Checklist[]>([]);
   const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [performanceData, setPerformanceData] = useState<Record<string, Record<string, WeeklyPerformance>>>({});
+  const [perfLoading, setPerfLoading] = useState(false);
 
   useEffect(() => {
     async function fetchData() {
@@ -97,6 +99,15 @@ export default function AdminReport() {
       setSelectedTeamIds(defaultTeams.length > 0 ? defaultTeams.map(t => t.id) : teams.map(t => t.id));
     }
   }, [teams]);
+
+  useEffect(() => {
+    if (selectedTeamIds.length === 0 || !startWeek || !endWeek) return;
+    setPerfLoading(true);
+    adPerformanceApi.getWeeklyReport(startWeek, endWeek, selectedTeamIds)
+      .then(data => setPerformanceData(data))
+      .catch(() => setPerformanceData({}))
+      .finally(() => setPerfLoading(false));
+  }, [startWeek, endWeek, selectedTeamIds]);
 
   const filteredTeams = teams.filter(t => selectedTeamIds.includes(t.id));
 
@@ -130,6 +141,27 @@ export default function AdminReport() {
     return entry;
   });
 
+  const perfChartData = selectedWeeks.map(week => {
+    const entry: Record<string, string | number> = { week: getWeekDateRange(week) };
+    for (const team of filteredTeams) {
+      entry[team.name] = performanceData[team.id]?.[week]?.spend ?? 0;
+    }
+    return entry;
+  });
+
+  const perfTotals = (() => {
+    let totalSpend = 0, totalImpressions = 0, totalClicks = 0;
+    for (const teamData of Object.values(performanceData)) {
+      for (const wp of Object.values(teamData)) {
+        totalSpend += wp.spend;
+        totalImpressions += wp.impressions;
+        totalClicks += wp.clicks;
+      }
+    }
+    const avgCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+    return { totalSpend, totalImpressions, totalClicks, avgCtr };
+  })();
+
   function exportToExcel() {
     const headerRow = ['팀', ...selectedWeeks.map(w => getWeekDateRange(w))];
     const dataRows = filteredTeams.map(team => [
@@ -140,6 +172,15 @@ export default function AdminReport() {
     const ws = XLSX.utils.aoa_to_sheet(worksheetData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '체크리스트 리포트');
+
+    const perfHeaderRow = ['팀', ...selectedWeeks.map(w => getWeekDateRange(w))];
+    const perfDataRows = filteredTeams.map(team => [
+      team.name,
+      ...selectedWeeks.map(w => performanceData[team.id]?.[w]?.spend ?? 0),
+    ]);
+    const perfWs = XLSX.utils.aoa_to_sheet([perfHeaderRow, ...perfDataRows]);
+    XLSX.utils.book_append_sheet(wb, perfWs, '광고 성과');
+
     XLSX.writeFile(wb, `checklist-report-${startWeek}-${endWeek}.xlsx`);
   }
 
@@ -217,6 +258,35 @@ export default function AdminReport() {
           </CardContent>
         </Card>
 
+        {!perfLoading && Object.keys(performanceData).length > 0 && (
+          <div className="grid grid-cols-4 gap-4">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-sm text-muted-foreground">총 광고비</div>
+                <div className="text-2xl font-bold">{perfTotals.totalSpend.toLocaleString()}원</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-sm text-muted-foreground">총 노출</div>
+                <div className="text-2xl font-bold">{perfTotals.totalImpressions.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-sm text-muted-foreground">총 클릭</div>
+                <div className="text-2xl font-bold">{perfTotals.totalClicks.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-sm text-muted-foreground">평균 CTR</div>
+                <div className="text-2xl font-bold">{perfTotals.avgCtr.toFixed(2)}%</div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
         {loading ? (
           <div className="flex justify-center py-12 text-muted-foreground">데이터를 불러오는 중...</div>
         ) : teams.length === 0 ? (
@@ -246,6 +316,27 @@ export default function AdminReport() {
                       />
                     ))}
                   </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+
+            {/* Line Chart - 광고비 추이 */}
+            <Card>
+              <CardHeader>
+                <CardTitle>주간 광고비 추이</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={perfChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="week" />
+                    <YAxis tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
+                    <Tooltip formatter={(value: unknown) => `${Number(value).toLocaleString()}원`} />
+                    <Legend />
+                    {filteredTeams.map((team, i) => (
+                      <Line key={team.id} type="monotone" dataKey={team.name} stroke={COLORS[i % COLORS.length]} />
+                    ))}
+                  </LineChart>
                 </ResponsiveContainer>
               </CardContent>
             </Card>
@@ -288,7 +379,14 @@ export default function AdminReport() {
                                         : undefined,
                                 }}
                               >
-                                {rate}%
+                                <div>{rate}%</div>
+                                {performanceData[team.id]?.[week] && (
+                                  <div className="text-xs text-muted-foreground mt-1">
+                                    {performanceData[team.id][week].spend.toLocaleString()}원
+                                    <br />
+                                    CTR {performanceData[team.id][week].ctr.toFixed(2)}%
+                                  </div>
+                                )}
                               </td>
                             );
                           })}

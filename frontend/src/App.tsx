@@ -8,6 +8,7 @@ import { CopyTypes } from '@/pages/CopyTypes';
 import { CopyGenerator } from '@/pages/CopyGenerator';
 import { Checklist } from '@/pages/Checklist';
 import { BestCopies } from '@/pages/BestCopies';
+import Analytics from '@/pages/Analytics';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import Pending from '@/pages/Pending';
@@ -54,6 +55,12 @@ export default function App() {
           <Route path="/best" element={
             <ProtectedRoute>
               <MainLayout><BestCopies /></MainLayout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/analytics" element={
+            <ProtectedRoute>
+              <MainLayout><Analytics /></MainLayout>
             </ProtectedRoute>
           } />
 

@@ -9,6 +9,7 @@ import {
   Wand2,
   CheckSquare,
   Trophy,
+  BarChart3,
   Users,
   Building2,
   ClipboardList,
@@ -22,6 +23,7 @@ const menuItems = [
   { icon: Wand2, label: 'AI 생성', path: '/generator' },
   { icon: CheckSquare, label: '체크리스트', path: '/checklist' },
   { icon: Trophy, label: '등록소재 성과추적', path: '/best' },
+  { icon: BarChart3, label: '원고유형 분석', path: '/analytics' },
 ];
 
 const leaderMenuItems = [

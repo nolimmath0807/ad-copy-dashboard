@@ -185,3 +185,24 @@ export interface AdPerformance {
   revenue: number | null;
   conversions: number | null;
 }
+
+// Copy Type Performance
+export interface CopyTypePerformance {
+  copy_type_code: string;
+  copy_type_name: string;
+  total_spend: number;
+  total_impressions: number;
+  total_clicks: number;
+  avg_ctr: number;
+  utm_count: number;
+}
+
+// Weekly Team Performance
+export interface WeeklyPerformance {
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+}
+
+export type WeeklyTeamPerformance = Record<string, Record<string, WeeklyPerformance>>;

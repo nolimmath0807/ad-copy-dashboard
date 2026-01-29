@@ -21,6 +21,8 @@ import type {
   AuthLogin,
   AuthResponse,
   AdPerformance,
+  CopyTypePerformance,
+  WeeklyTeamPerformance,
 } from '@/types';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -143,5 +145,15 @@ export const adPerformanceApi = {
     fetchAPI<Record<string, AdPerformance>>('/api/ad-performance/by-utm', {
       method: 'POST',
       body: JSON.stringify({ utm_codes: utmCodes, month }),
+    }),
+  getCopyTypePerformance: (month: string, teamId?: string) =>
+    fetchAPI<CopyTypePerformance[]>('/api/ad-performance/copy-type', {
+      method: 'POST',
+      body: JSON.stringify({ month, team_id: teamId }),
+    }),
+  getWeeklyReport: (startWeek: string, endWeek: string, teamIds: string[]) =>
+    fetchAPI<WeeklyTeamPerformance>('/api/ad-performance/weekly-report', {
+      method: 'POST',
+      body: JSON.stringify({ start_week: startWeek, end_week: endWeek, team_ids: teamIds }),
     }),
 };

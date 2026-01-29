@@ -47,6 +47,8 @@ from ai.regenerate_copy import regenerate_copy
 
 # Ad Performance
 from ad_performance.get_meta_performance import get_performance_by_utm_codes
+from ad_performance.get_copy_type_performance import get_performance_by_copy_type
+from ad_performance.get_weekly_performance import get_weekly_team_performance
 
 # Teams
 from teams.list_teams import list_teams
@@ -205,6 +207,16 @@ class PasswordReset(BaseModel):
 class AdPerformanceRequest(BaseModel):
     utm_codes: list[str]
     month: str
+
+
+class CopyTypePerformanceRequest(BaseModel):
+    month: str
+    team_id: Optional[str] = None
+
+class WeeklyPerformanceRequest(BaseModel):
+    start_week: str
+    end_week: str
+    team_ids: list[str]
 
 
 # ============================================
@@ -472,6 +484,16 @@ def api_regenerate_copy(copy_id: str):
 @app.post("/api/ad-performance/by-utm")
 def api_get_ad_performance(data: AdPerformanceRequest):
     return get_performance_by_utm_codes(data.utm_codes, data.month)
+
+
+@app.post("/api/ad-performance/copy-type")
+def api_get_copy_type_performance(data: CopyTypePerformanceRequest):
+    return get_performance_by_copy_type(data.month, data.team_id)
+
+
+@app.post("/api/ad-performance/weekly-report")
+def api_get_weekly_performance(data: WeeklyPerformanceRequest):
+    return get_weekly_team_performance(data.start_week, data.end_week, data.team_ids)
 
 
 # ============================================
