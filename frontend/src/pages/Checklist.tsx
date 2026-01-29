@@ -108,25 +108,25 @@ export function Checklist() {
   const [newUtmInput, setNewUtmInput] = useState<Record<string, string>>({});
 
   const recentWeeks = getRecentWeeks(8);
-  const isAdmin = user?.is_admin ?? false;
+  const isAdminOrLeader = user?.role === 'admin' || user?.role === 'leader';
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Initialize selectedTeamId based on user role
   useEffect(() => {
     if (user) {
-      if (!isAdmin) {
+      if (!isAdminOrLeader) {
         setSelectedTeamId(user.team_id);
       }
       setIsInitialized(true);
     }
-  }, [user, isAdmin]);
+  }, [user, isAdminOrLeader]);
 
   // Load teams for admin
   useEffect(() => {
-    if (isAdmin) {
+    if (isAdminOrLeader) {
       teamsApi.list().then(setTeams);
     }
-  }, [isAdmin]);
+  }, [isAdminOrLeader]);
 
   useEffect(() => {
     // 사용자 초기화가 완료된 후에만 데이터 로드
@@ -286,7 +286,7 @@ export function Checklist() {
                   ))}
                 </SelectContent>
               </Select>
-              {isAdmin && (
+              {isAdminOrLeader && (
                 <Select value={selectedTeamId || 'all'} onValueChange={(value) => setSelectedTeamId(value === 'all' ? undefined : value)}>
                   <SelectTrigger className="w-48">
                     <SelectValue placeholder="팀 선택" />

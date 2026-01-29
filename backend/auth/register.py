@@ -21,7 +21,7 @@ def register_user(email: str, password: str, name: str, team_id: str):
         "name": name,
         "team_id": team_id,
         "is_approved": False,
-        "is_admin": False
+        "role": "user"
     }
 
     response = client.table("users").insert(user_data).execute()

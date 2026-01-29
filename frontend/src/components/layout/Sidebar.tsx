@@ -23,9 +23,12 @@ const menuItems = [
   { icon: Trophy, label: '베스트 원고', path: '/best' },
 ];
 
+const leaderMenuItems = [
+  { icon: Building2, label: '팀 관리', path: '/admin/teams' },
+];
+
 const adminMenuItems = [
   { icon: Users, label: '사용자 관리', path: '/admin/users' },
-  { icon: Building2, label: '팀 관리', path: '/admin/teams' },
 ];
 
 export function Sidebar() {
@@ -58,13 +61,31 @@ export function Sidebar() {
           );
         })}
 
-        {user?.is_admin && (
+        {(user?.role === 'admin' || user?.role === 'leader') && (
           <>
             <div className="my-4 border-t" />
             <p className="px-3 py-2 text-xs font-semibold text-muted-foreground uppercase">
               관리자
             </p>
-            {adminMenuItems.map((item) => {
+            {leaderMenuItems.map((item) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                    isActive
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.label}
+                </Link>
+              );
+            })}
+            {user?.role === 'admin' && adminMenuItems.map((item) => {
               const isActive = location.pathname === item.path;
               return (
                 <Link

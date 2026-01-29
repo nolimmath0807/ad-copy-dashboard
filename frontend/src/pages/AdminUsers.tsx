@@ -57,8 +57,10 @@ export default function AdminUsers() {
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{user.team?.name || '-'}</TableCell>
                     <TableCell>
-                      {user.is_admin ? (
+                      {user.role === 'admin' ? (
                         <Badge variant="default">관리자</Badge>
+                      ) : user.role === 'leader' ? (
+                        <Badge variant="default">리더</Badge>
                       ) : user.is_approved ? (
                         <Badge variant="secondary">승인됨</Badge>
                       ) : (
@@ -67,7 +69,7 @@ export default function AdminUsers() {
                     </TableCell>
                     <TableCell>{new Date(user.created_at).toLocaleDateString('ko-KR')}</TableCell>
                     <TableCell>
-                      {!user.is_approved && !user.is_admin && (
+                      {!user.is_approved && user.role === 'user' && (
                         <Button size="sm" onClick={() => handleApprove(user.id)}>
                           <Check className="w-4 h-4 mr-1" />
                           승인

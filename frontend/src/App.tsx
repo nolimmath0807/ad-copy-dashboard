@@ -58,12 +58,12 @@ export default function App() {
 
           {/* Admin routes */}
           <Route path="/admin/users" element={
-            <ProtectedRoute requireAdmin>
+            <ProtectedRoute requireRole="admin">
               <MainLayout><AdminUsers /></MainLayout>
             </ProtectedRoute>
           } />
           <Route path="/admin/teams" element={
-            <ProtectedRoute requireAdmin>
+            <ProtectedRoute requireRole="leader">
               <MainLayout><AdminTeams /></MainLayout>
             </ProtectedRoute>
           } />

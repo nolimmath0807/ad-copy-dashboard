@@ -141,7 +141,7 @@ export interface User {
   team_id: string;
   team?: Team;
   is_approved: boolean;
-  is_admin: boolean;
+  role: 'user' | 'leader' | 'admin';
   created_at: string;
 }
 
