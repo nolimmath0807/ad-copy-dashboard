@@ -5,11 +5,15 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Check } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Check, Pencil, KeyRound } from 'lucide-react';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [editingNameId, setEditingNameId] = useState<string | null>(null);
+  const [editingNameValue, setEditingNameValue] = useState('');
 
   const loadUsers = async () => {
     const data = await authApi.listUsers();
@@ -21,9 +25,27 @@ export default function AdminUsers() {
     loadUsers();
   }, []);
 
+  const handleRoleChange = async (userId: string, role: string) => {
+    await authApi.updateRole(userId, role);
+    loadUsers();
+  };
+
   const handleApprove = async (userId: string) => {
     await authApi.approve(userId);
     loadUsers();
+  };
+
+  const handleNameUpdate = async (userId: string, name: string) => {
+    await authApi.updateName(userId, name);
+    setEditingNameId(null);
+    loadUsers();
+  };
+
+  const handlePasswordReset = async (userId: string) => {
+    const newPassword = window.prompt('새 비밀번호를 입력하세요');
+    if (!newPassword) return;
+    await authApi.resetPassword(userId, newPassword);
+    alert('비밀번호가 재설정되었습니다.');
   };
 
   return (
@@ -46,6 +68,7 @@ export default function AdminUsers() {
                   <TableHead>이메일</TableHead>
                   <TableHead>소속 팀</TableHead>
                   <TableHead>상태</TableHead>
+                  <TableHead>역할</TableHead>
                   <TableHead>가입일</TableHead>
                   <TableHead>작업</TableHead>
                 </TableRow>
@@ -53,7 +76,32 @@ export default function AdminUsers() {
               <TableBody>
                 {users.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell className="font-medium">{user.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {editingNameId === user.id ? (
+                        <Input
+                          value={editingNameValue}
+                          onChange={(e) => setEditingNameValue(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleNameUpdate(user.id, editingNameValue);
+                            if (e.key === 'Escape') setEditingNameId(null);
+                          }}
+                          onBlur={() => handleNameUpdate(user.id, editingNameValue)}
+                          className="h-8 w-[140px]"
+                          autoFocus
+                        />
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-1.5 cursor-pointer group"
+                          onClick={() => {
+                            setEditingNameId(user.id);
+                            setEditingNameValue(user.name);
+                          }}
+                        >
+                          {user.name}
+                          <Pencil className="w-3.5 h-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>{user.team?.name || '-'}</TableCell>
                     <TableCell>
@@ -67,14 +115,32 @@ export default function AdminUsers() {
                         <Badge variant="outline">대기중</Badge>
                       )}
                     </TableCell>
+                    <TableCell>
+                      <Select value={user.role} onValueChange={(value) => handleRoleChange(user.id, value)}>
+                        <SelectTrigger className="w-[120px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="user">사용자</SelectItem>
+                          <SelectItem value="leader">리더</SelectItem>
+                          <SelectItem value="admin">관리자</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableCell>
                     <TableCell>{new Date(user.created_at).toLocaleDateString('ko-KR')}</TableCell>
                     <TableCell>
-                      {!user.is_approved && user.role === 'user' && (
-                        <Button size="sm" onClick={() => handleApprove(user.id)}>
-                          <Check className="w-4 h-4 mr-1" />
-                          승인
+                      <div className="flex items-center gap-2">
+                        {!user.is_approved && user.role === 'user' && (
+                          <Button size="sm" onClick={() => handleApprove(user.id)}>
+                            <Check className="w-4 h-4 mr-1" />
+                            승인
+                          </Button>
+                        )}
+                        <Button size="sm" variant="outline" onClick={() => handlePasswordReset(user.id)}>
+                          <KeyRound className="w-4 h-4 mr-1" />
+                          PW 재설정
                         </Button>
-                      )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}

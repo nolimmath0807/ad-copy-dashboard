@@ -61,6 +61,8 @@ from auth.login import login_user
 from auth.me import get_current_user
 from auth.approve import approve_user
 from auth.list_users import list_users
+from auth.update_role import update_user_role
+from auth.update_user import update_user_name, reset_user_password
 
 
 app = FastAPI(
@@ -182,6 +184,18 @@ class AuthRegister(BaseModel):
 
 class AuthLogin(BaseModel):
     email: str
+    password: str
+
+
+class RoleUpdate(BaseModel):
+    role: str
+
+
+class UserNameUpdate(BaseModel):
+    name: str
+
+
+class PasswordReset(BaseModel):
     password: str
 
 
@@ -410,6 +424,23 @@ def api_list_users():
 @app.put("/api/auth/approve/{id}")
 def api_approve_user(id: str):
     return approve_user(id)
+
+
+@app.put("/api/auth/role/{id}")
+def api_update_role(id: str, data: RoleUpdate):
+    if data.role not in ("user", "leader", "admin"):
+        raise HTTPException(status_code=400, detail="Invalid role")
+    return update_user_role(id, data.role)
+
+
+@app.put("/api/auth/users/{id}/name")
+def api_update_user_name(id: str, data: UserNameUpdate):
+    return update_user_name(id, data.name)
+
+
+@app.put("/api/auth/users/{id}/password")
+def api_reset_password(id: str, data: PasswordReset):
+    return reset_user_password(id, data.password)
 
 
 # ============================================

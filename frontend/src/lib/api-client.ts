@@ -116,6 +116,9 @@ export const authApi = {
   }),
   listUsers: () => fetchAPI<User[]>('/api/auth/users'),
   approve: (id: string) => fetchAPI<User>(`/api/auth/approve/${id}`, { method: 'PUT' }),
+  updateRole: (id: string, role: string) => fetchAPI<User>(`/api/auth/role/${id}`, { method: 'PUT', body: JSON.stringify({ role }) }),
+  updateName: (id: string, name: string) => fetchAPI<User>(`/api/auth/users/${id}/name`, { method: 'PUT', body: JSON.stringify({ name }) }),
+  resetPassword: (id: string, password: string) => fetchAPI<User>(`/api/auth/users/${id}/password`, { method: 'PUT', body: JSON.stringify({ password }) }),
 };
 
 // AI API
