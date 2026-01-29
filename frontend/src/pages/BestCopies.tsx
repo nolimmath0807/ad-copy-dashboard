@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import { adPerformanceApi, checklistsApi } from '@/lib/api-client';
 import type { AdPerformance, Checklist } from '@/types';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Trophy } from 'lucide-react';
 
 function generateMonthOptions() {
@@ -147,109 +148,152 @@ export function BestCopies() {
           </Select>
         </div>
 
-        {/* 총 성과 요약 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">총 광고비</p>
-              <p className="text-2xl font-bold">{formatCurrency(totalSpend)}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">총 노출수</p>
-              <p className="text-2xl font-bold">{totalImpressions.toLocaleString()}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">총 클릭수</p>
-              <p className="text-2xl font-bold">{totalClicks.toLocaleString()}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <p className="text-sm text-muted-foreground">평균 CTR</p>
-              <p className="text-2xl font-bold">{totalCtr}%</p>
-            </CardContent>
-          </Card>
-        </div>
+        {loading ? (
+          <>
+            {/* Skeleton stat cards */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[...Array(4)].map((_, i) => (
+                <Card key={i}>
+                  <CardContent className="pt-6">
+                    <Skeleton className="h-4 w-20 mb-2" />
+                    <Skeleton className="h-8 w-28" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
 
-        {/* UTM 코드별 성과 목록 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>UTM 코드별 성과</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="py-8 text-center text-muted-foreground">로딩 중...</div>
-            ) : rows.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground">
-                UTM 코드가 등록된 소재가 없습니다
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {rows.map((row, index) => (
-                  <div
-                    key={`${row.checklist.id}-${row.utmCode}`}
-                    className="flex items-start gap-4 p-4 rounded-lg border bg-card"
-                  >
-                    <div className="flex-shrink-0">
-                      <Badge
-                        variant={index < 3 && row.perf ? 'default' : 'secondary'}
-                        className={
-                          index === 0 && row.perf
-                            ? 'bg-yellow-500 hover:bg-yellow-600'
-                            : index === 1 && row.perf
-                            ? 'bg-gray-400 hover:bg-gray-500'
-                            : index === 2 && row.perf
-                            ? 'bg-amber-600 hover:bg-amber-700'
-                            : ''
-                        }
-                      >
-                        {index + 1}
-                      </Badge>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        {(row.checklist.product || row.checklist.products) && (
-                          <Badge variant="outline">
-                            {(row.checklist.product || row.checklist.products)!.name}
-                          </Badge>
-                        )}
-                        {(row.checklist.copy_type || row.checklist.copy_types) && (
-                          <Badge variant="secondary">
-                            {(row.checklist.copy_type || row.checklist.copy_types)!.code}
-                          </Badge>
-                        )}
+            {/* Skeleton UTM list */}
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-40" />
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {[...Array(6)].map((_, i) => (
+                    <div key={i} className="flex items-start gap-4 p-4 rounded-lg border bg-card">
+                      <Skeleton className="h-6 w-6 rounded-full" />
+                      <div className="flex-1 space-y-2">
+                        <div className="flex gap-2">
+                          <Skeleton className="h-5 w-16" />
+                          <Skeleton className="h-5 w-12" />
+                        </div>
+                        <Skeleton className="h-4 w-32" />
                       </div>
-                      <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                        {row.utmCode}
-                      </span>
+                      <div className="space-y-1 text-right">
+                        <Skeleton className="h-6 w-20 ml-auto" />
+                        <Skeleton className="h-3 w-12 ml-auto" />
+                      </div>
                     </div>
-                    <div className="flex-shrink-0 text-right space-y-1">
-                      {row.perf ? (
-                        <>
-                          <p className="text-lg font-bold text-primary">
-                            {formatCurrency(row.perf.spend)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">광고비</p>
-                          <div className="text-xs text-muted-foreground space-y-0.5 pt-1 border-t">
-                            <p>노출 {row.perf.impressions.toLocaleString()}</p>
-                            <p>클릭 {row.perf.clicks.toLocaleString()}</p>
-                            <p>CTR {row.perf.ctr}%</p>
-                          </div>
-                        </>
-                      ) : (
-                        <p className="text-sm text-muted-foreground">-</p>
-                      )}
-                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <>
+            {/* 총 성과 요약 */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">총 광고비</p>
+                  <p className="text-2xl font-bold">{formatCurrency(totalSpend)}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">총 노출수</p>
+                  <p className="text-2xl font-bold">{totalImpressions.toLocaleString()}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">총 클릭수</p>
+                  <p className="text-2xl font-bold">{totalClicks.toLocaleString()}</p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-6">
+                  <p className="text-sm text-muted-foreground">평균 CTR</p>
+                  <p className="text-2xl font-bold">{totalCtr}%</p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* UTM 코드별 성과 목록 */}
+            <Card>
+              <CardHeader>
+                <CardTitle>UTM 코드별 성과</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {rows.length === 0 ? (
+                  <div className="py-8 text-center text-muted-foreground">
+                    UTM 코드가 등록된 소재가 없습니다
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                ) : (
+                  <div className="space-y-3">
+                    {rows.map((row, index) => (
+                      <div
+                        key={`${row.checklist.id}-${row.utmCode}`}
+                        className="flex items-start gap-4 p-4 rounded-lg border bg-card"
+                      >
+                        <div className="flex-shrink-0">
+                          <Badge
+                            variant={index < 3 && row.perf ? 'default' : 'secondary'}
+                            className={
+                              index === 0 && row.perf
+                                ? 'bg-yellow-500 hover:bg-yellow-600'
+                                : index === 1 && row.perf
+                                ? 'bg-gray-400 hover:bg-gray-500'
+                                : index === 2 && row.perf
+                                ? 'bg-amber-600 hover:bg-amber-700'
+                                : ''
+                            }
+                          >
+                            {index + 1}
+                          </Badge>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            {(row.checklist.product || row.checklist.products) && (
+                              <Badge variant="outline">
+                                {(row.checklist.product || row.checklist.products)!.name}
+                              </Badge>
+                            )}
+                            {(row.checklist.copy_type || row.checklist.copy_types) && (
+                              <Badge variant="secondary">
+                                {(row.checklist.copy_type || row.checklist.copy_types)!.code}
+                              </Badge>
+                            )}
+                          </div>
+                          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                            {row.utmCode}
+                          </span>
+                        </div>
+                        <div className="flex-shrink-0 text-right space-y-1">
+                          {row.perf ? (
+                            <>
+                              <p className="text-lg font-bold text-primary">
+                                {formatCurrency(row.perf.spend)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">광고비</p>
+                              <div className="text-xs text-muted-foreground space-y-0.5 pt-1 border-t">
+                                <p>노출 {row.perf.impressions.toLocaleString()}</p>
+                                <p>클릭 {row.perf.clicks.toLocaleString()}</p>
+                                <p>CTR {row.perf.ctr}%</p>
+                              </div>
+                            </>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">-</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
     </>
   );
