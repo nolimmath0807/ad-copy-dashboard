@@ -21,7 +21,7 @@ const menuItems = [
   { icon: FileText, label: '원고 유형', path: '/copy-types' },
   { icon: Wand2, label: 'AI 생성', path: '/generator' },
   { icon: CheckSquare, label: '체크리스트', path: '/checklist' },
-  { icon: Trophy, label: '베스트 원고', path: '/best' },
+  { icon: Trophy, label: '등록소재 성과추적', path: '/best' },
 ];
 
 const leaderMenuItems = [

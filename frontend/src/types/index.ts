@@ -173,3 +173,13 @@ export interface TeamProduct {
   product_id: string;
   created_at: string;
 }
+
+// Ad Performance
+export interface AdPerformance {
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  revenue: number | null;
+  conversions: number | null;
+}

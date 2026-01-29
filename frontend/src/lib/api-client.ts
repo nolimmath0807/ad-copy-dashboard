@@ -20,6 +20,7 @@ import type {
   AuthRegister,
   AuthLogin,
   AuthResponse,
+  AdPerformance,
 } from '@/types';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -134,4 +135,13 @@ export const aiApi = {
     }),
   regenerate: (copyId: string) =>
     fetchAPI<GeneratedCopy>(`/api/ai/regenerate/${copyId}`, { method: 'POST' }),
+};
+
+// Ad Performance API
+export const adPerformanceApi = {
+  getByUtmCodes: (utmCodes: string[], month: string) =>
+    fetchAPI<Record<string, AdPerformance>>('/api/ad-performance/by-utm', {
+      method: 'POST',
+      body: JSON.stringify({ utm_codes: utmCodes, month }),
+    }),
 };

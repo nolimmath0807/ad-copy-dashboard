@@ -45,6 +45,9 @@ from best_copies.create_best import create_best_copy
 from ai.generate_copy import generate_ad_copy
 from ai.regenerate_copy import regenerate_copy
 
+# Ad Performance
+from ad_performance.get_meta_performance import get_performance_by_utm_codes
+
 # Teams
 from teams.list_teams import list_teams
 from teams.create_team import create_team
@@ -197,6 +200,11 @@ class UserNameUpdate(BaseModel):
 
 class PasswordReset(BaseModel):
     password: str
+
+
+class AdPerformanceRequest(BaseModel):
+    utm_codes: list[str]
+    month: str
 
 
 # ============================================
@@ -455,6 +463,15 @@ def api_generate_copy(data: AIGenerateRequest):
 @app.post("/api/ai/regenerate/{copy_id}", status_code=status.HTTP_201_CREATED)
 def api_regenerate_copy(copy_id: str):
     return regenerate_copy(copy_id)
+
+
+# ============================================
+# Ad Performance API
+# ============================================
+
+@app.post("/api/ad-performance/by-utm")
+def api_get_ad_performance(data: AdPerformanceRequest):
+    return get_performance_by_utm_codes(data.utm_codes, data.month)
 
 
 # ============================================
