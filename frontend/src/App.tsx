@@ -15,6 +15,7 @@ import Pending from '@/pages/Pending';
 import AdminUsers from '@/pages/AdminUsers';
 import AdminTeams from '@/pages/AdminTeams';
 import AdminReport from '@/pages/AdminReport';
+import AuditLogs from '@/pages/AuditLogs';
 
 export default function App() {
   return (
@@ -78,6 +79,11 @@ export default function App() {
           <Route path="/admin/report" element={
             <ProtectedRoute requireRole="admin">
               <MainLayout><AdminReport /></MainLayout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/audit" element={
+            <ProtectedRoute requireRole="admin">
+              <MainLayout><AuditLogs /></MainLayout>
             </ProtectedRoute>
           } />
         </Routes>

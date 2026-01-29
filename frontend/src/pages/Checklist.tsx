@@ -145,7 +145,7 @@ export function Checklist() {
       const [allProductsData, copyTypesData, checklistsData, teamProductsData] = await Promise.all([
         productsApi.list(),
         copyTypesApi.list(),
-        checklistsApi.list(selectedTeamId),
+        checklistsApi.list(selectedTeamId, selectedWeek),
         selectedTeamId ? teamProductsApi.list(selectedTeamId) : Promise.resolve([]),
       ]);
 
@@ -169,15 +169,15 @@ export function Checklist() {
       setCopyTypes(copyTypesData);
 
       // 선택한 주차 데이터만 필터링
-      let filteredChecklists = checklistsData.filter((c: any) => c.week === selectedWeek);
+      let filteredChecklists = checklistsData;
 
       // 해당 주차에 체크리스트 데이터가 없으면 자동 생성
       if (filteredChecklists.length === 0 && productsData.length > 0 && copyTypesData.length > 0) {
         try {
           console.log('[Checklist] Auto-initializing week:', selectedWeek);
           await checklistsApi.initWeek(selectedWeek);
-          const refreshedData = await checklistsApi.list(selectedTeamId);
-          filteredChecklists = refreshedData.filter((c: any) => c.week === selectedWeek);
+          const refreshedData = await checklistsApi.list(selectedTeamId, selectedWeek);
+          filteredChecklists = refreshedData;
         } catch (err) {
           console.error('[Checklist] Failed to auto-init week:', err);
         }
@@ -194,14 +194,18 @@ export function Checklist() {
       setUtmData(data);
       setNewUtmInput({});
 
-      // 지난주 미완료 카운트 (UTM 코드 없거나 빈 배열인 것)
-      const lastWeek = getPreviousWeek(selectedWeek);
-      const lastWeekData = checklistsData.filter((c: any) => {
-        if (c.week !== lastWeek) return false;
-        const codes = parseUtmCodes(c.utm_code);
-        return codes.length === 0;
-      });
-      setLastWeekIncomplete(lastWeekData.length);
+      // 지난주 미완료 카운트
+      try {
+        const lastWeek = getPreviousWeek(selectedWeek);
+        const lastWeekData = await checklistsApi.list(selectedTeamId, lastWeek);
+        const incomplete = lastWeekData.filter((c: any) => {
+          const codes = parseUtmCodes(c.utm_code);
+          return codes.length === 0;
+        });
+        setLastWeekIncomplete(incomplete.length);
+      } catch {
+        setLastWeekIncomplete(0);
+      }
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {

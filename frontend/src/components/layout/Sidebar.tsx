@@ -13,6 +13,7 @@ import {
   Users,
   Building2,
   ClipboardList,
+  ScrollText,
   LogOut
 } from 'lucide-react';
 
@@ -33,6 +34,7 @@ const leaderMenuItems = [
 const adminMenuItems = [
   { icon: Users, label: '사용자 관리', path: '/admin/users' },
   { icon: ClipboardList, label: '리포트', path: '/admin/report' },
+  { icon: ScrollText, label: '감사 로그', path: '/admin/audit' },
 ];
 
 export function Sidebar() {

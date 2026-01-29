@@ -5,9 +5,12 @@ sys.path.insert(0, "/Users/las/Development/project/ad-copy-dashboard/backend")
 from conn import get_supabase_client
 
 
-def get_checklist_stats():
+def get_checklist_stats(team_id: str = None):
     client = get_supabase_client()
-    response = client.table("checklists").select("status").execute()
+    query = client.table("checklists").select("status")
+    if team_id:
+        query = query.eq("team_id", team_id)
+    response = query.execute()
     data = response.data
     total = len(data)
     completed = len([d for d in data if d["status"] == "completed"])
@@ -22,8 +25,8 @@ def get_checklist_stats():
     }
 
 
-def main(verbose: bool):
-    stats = get_checklist_stats()
+def main(verbose: bool, team_id: str = None):
+    stats = get_checklist_stats(team_id)
     if verbose:
         print("Checklist Statistics:")
         print(f"  Total: {stats['total']}")
@@ -39,6 +42,7 @@ def main(verbose: bool):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Get checklist statistics")
     parser.add_argument("--verbose", action="store_true", help="Print formatted output")
+    parser.add_argument("--team-id", help="Filter by team ID")
     args = parser.parse_args()
 
-    main(args.verbose)
+    main(args.verbose, args.team_id)

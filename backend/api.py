@@ -10,6 +10,10 @@ from pydantic import BaseModel
 from typing import Optional
 import uvicorn
 
+# Audit
+from audit.log import write_audit_log
+from audit.list_logs import list_audit_logs
+
 # Products
 from products.list_products import list_products
 from products.get_product import get_product
@@ -83,6 +87,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+def get_user_id_from_request(authorization: str = None) -> str | None:
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    token = authorization.replace("Bearer ", "")
+    try:
+        return token.split(":")[0]
+    except:
+        return None
 
 
 # ============================================
@@ -237,20 +251,25 @@ def api_get_product(id: str):
 
 
 @app.post("/api/products", status_code=status.HTTP_201_CREATED)
-def api_create_product(data: ProductCreate):
+def api_create_product(data: ProductCreate, authorization: str = Header(None)):
     product_data = data.model_dump(exclude_none=True)
-    return create_product(product_data)
+    result = create_product(product_data)
+    write_audit_log(get_user_id_from_request(authorization), "create", "products", result.get("id") if isinstance(result, dict) else None, product_data)
+    return result
 
 
 @app.put("/api/products/{id}")
-def api_update_product(id: str, data: ProductUpdate):
+def api_update_product(id: str, data: ProductUpdate, authorization: str = Header(None)):
     product_data = data.model_dump(exclude_none=True)
-    return update_product(id, product_data)
+    result = update_product(id, product_data)
+    write_audit_log(get_user_id_from_request(authorization), "update", "products", id, product_data)
+    return result
 
 
 @app.delete("/api/products/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def api_delete_product(id: str):
+def api_delete_product(id: str, authorization: str = Header(None)):
     delete_product(id)
+    write_audit_log(get_user_id_from_request(authorization), "delete", "products", id, None)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -272,20 +291,25 @@ def api_get_copy_type(id: str):
 
 
 @app.post("/api/copy-types", status_code=status.HTTP_201_CREATED)
-def api_create_copy_type(data: CopyTypeCreate):
+def api_create_copy_type(data: CopyTypeCreate, authorization: str = Header(None)):
     copy_type_data = data.model_dump(exclude_none=True)
-    return create_copy_type(copy_type_data)
+    result = create_copy_type(copy_type_data)
+    write_audit_log(get_user_id_from_request(authorization), "create", "copy_types", result.get("id") if isinstance(result, dict) else None, copy_type_data)
+    return result
 
 
 @app.put("/api/copy-types/{id}")
-def api_update_copy_type(id: str, data: CopyTypeUpdate):
+def api_update_copy_type(id: str, data: CopyTypeUpdate, authorization: str = Header(None)):
     copy_type_data = data.model_dump(exclude_none=True)
-    return update_copy_type(id, copy_type_data)
+    result = update_copy_type(id, copy_type_data)
+    write_audit_log(get_user_id_from_request(authorization), "update", "copy_types", id, copy_type_data)
+    return result
 
 
 @app.delete("/api/copy-types/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def api_delete_copy_type(id: str):
+def api_delete_copy_type(id: str, authorization: str = Header(None)):
     delete_copy_type(id)
+    write_audit_log(get_user_id_from_request(authorization), "delete", "copy_types", id, None)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -307,7 +331,7 @@ def api_get_copy(id: str):
 
 
 @app.post("/api/copies", status_code=status.HTTP_201_CREATED)
-def api_create_copy(data: GeneratedCopyCreate):
+def api_create_copy(data: GeneratedCopyCreate, authorization: str = Header(None)):
     copy_data = {
         "product_id": data.product_id,
         "copy_type_id": data.copy_type_id,
@@ -315,18 +339,23 @@ def api_create_copy(data: GeneratedCopyCreate):
     }
     if data.ad_spend is not None:
         copy_data["ad_spend"] = data.ad_spend
-    return create_copy(copy_data)
+    result = create_copy(copy_data)
+    write_audit_log(get_user_id_from_request(authorization), "create", "copies", result.get("id") if isinstance(result, dict) else None, copy_data)
+    return result
 
 
 @app.put("/api/copies/{id}")
-def api_update_copy(id: str, data: GeneratedCopyUpdate):
+def api_update_copy(id: str, data: GeneratedCopyUpdate, authorization: str = Header(None)):
     copy_data = data.model_dump(exclude_none=True)
-    return update_copy(id, copy_data)
+    result = update_copy(id, copy_data)
+    write_audit_log(get_user_id_from_request(authorization), "update", "copies", id, copy_data)
+    return result
 
 
 @app.delete("/api/copies/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def api_delete_copy(id: str):
+def api_delete_copy(id: str, authorization: str = Header(None)):
     delete_copy(id)
+    write_audit_log(get_user_id_from_request(authorization), "delete", "copies", id, None)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -345,14 +374,16 @@ def api_init_week(week: Optional[str] = None):
 
 
 @app.get("/api/checklists/stats")
-def api_get_checklist_stats():
-    return get_checklist_stats()
+def api_get_checklist_stats(team_id: str = None):
+    return get_checklist_stats(team_id)
 
 
 @app.put("/api/checklists/{id}")
-def api_update_checklist(id: str, data: ChecklistUpdate):
+def api_update_checklist(id: str, data: ChecklistUpdate, authorization: str = Header(None)):
     checklist_data = data.model_dump(exclude_none=True)
-    return update_checklist(id, checklist_data)
+    result = update_checklist(id, checklist_data)
+    write_audit_log(get_user_id_from_request(authorization), "update", "checklists", id, checklist_data)
+    return result
 
 
 # ============================================
@@ -365,13 +396,15 @@ def api_list_best_copies(month: Optional[str] = None):
 
 
 @app.post("/api/best-copies", status_code=status.HTTP_201_CREATED)
-def api_create_best_copy(data: BestCopyCreate):
+def api_create_best_copy(data: BestCopyCreate, authorization: str = Header(None)):
     best_copy_data = {
         "copy_id": data.copy_id,
         "month": data.month,
         "ad_spend": data.ad_spend,
     }
-    return create_best_copy(best_copy_data)
+    result = create_best_copy(best_copy_data)
+    write_audit_log(get_user_id_from_request(authorization), "create", "best_copies", result.get("id") if isinstance(result, dict) else None, best_copy_data)
+    return result
 
 
 # ============================================
@@ -384,13 +417,16 @@ def api_list_teams():
 
 
 @app.post("/api/teams", status_code=status.HTTP_201_CREATED)
-def api_create_team(data: TeamCreate):
-    return create_team(data.name)
+def api_create_team(data: TeamCreate, authorization: str = Header(None)):
+    result = create_team(data.name)
+    write_audit_log(get_user_id_from_request(authorization), "create", "teams", result.get("id") if isinstance(result, dict) else None, {"name": data.name})
+    return result
 
 
 @app.delete("/api/teams/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def api_delete_team(id: str):
+def api_delete_team(id: str, authorization: str = Header(None)):
     delete_team(id)
+    write_audit_log(get_user_id_from_request(authorization), "delete", "teams", id, None)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -404,13 +440,20 @@ def api_list_team_products(team_id: Optional[str] = None):
 
 
 @app.post("/api/team-products", status_code=status.HTTP_201_CREATED)
-def api_create_team_product(data: TeamProductCreate):
-    return create_team_product(data.team_id, data.product_id)
+def api_create_team_product(data: TeamProductCreate, authorization: str = Header(None)):
+    result = create_team_product(data.team_id, data.product_id)
+    write_audit_log(get_user_id_from_request(authorization), "create", "team_products", result.get("id") if isinstance(result, dict) else None, {"team_id": data.team_id, "product_id": data.product_id})
+    try:
+        init_week_checklists()
+    except Exception as e:
+        print(f"[auto-init] Failed to init checklists after team_product create: {e}")
+    return result
 
 
 @app.delete("/api/team-products/{id}", status_code=status.HTTP_204_NO_CONTENT)
-def api_delete_team_product(id: str):
+def api_delete_team_product(id: str, authorization: str = Header(None)):
     delete_team_product(id)
+    write_audit_log(get_user_id_from_request(authorization), "delete", "team_products", id, None)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -442,15 +485,19 @@ def api_list_users():
 
 
 @app.put("/api/auth/approve/{id}")
-def api_approve_user(id: str):
-    return approve_user(id)
+def api_approve_user(id: str, authorization: str = Header(None)):
+    result = approve_user(id)
+    write_audit_log(get_user_id_from_request(authorization), "update", "users", id, {"is_approved": True})
+    return result
 
 
 @app.put("/api/auth/role/{id}")
-def api_update_role(id: str, data: RoleUpdate):
+def api_update_role(id: str, data: RoleUpdate, authorization: str = Header(None)):
     if data.role not in ("user", "leader", "admin"):
         raise HTTPException(status_code=400, detail="Invalid role")
-    return update_user_role(id, data.role)
+    result = update_user_role(id, data.role)
+    write_audit_log(get_user_id_from_request(authorization), "update", "users", id, {"role": data.role})
+    return result
 
 
 @app.put("/api/auth/users/{id}/name")
@@ -494,6 +541,15 @@ def api_get_copy_type_performance(data: CopyTypePerformanceRequest):
 @app.post("/api/ad-performance/weekly-report")
 def api_get_weekly_performance(data: WeeklyPerformanceRequest):
     return get_weekly_team_performance(data.start_week, data.end_week, data.team_ids)
+
+
+# ============================================
+# Audit Logs API
+# ============================================
+
+@app.get("/api/audit-logs")
+def api_list_audit_logs(table_name: Optional[str] = None, user_id: Optional[str] = None, limit: int = 100, offset: int = 0):
+    return list_audit_logs(table_name, user_id, limit, offset)
 
 
 # ============================================

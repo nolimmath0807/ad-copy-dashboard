@@ -23,14 +23,17 @@ import type {
   AdPerformance,
   CopyTypePerformance,
   WeeklyTeamPerformance,
+  AuditLog,
 } from '@/types';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
 async function fetchAPI<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('access_token');
   const response = await fetch(`${API_URL}${endpoint}`, {
     headers: {
       'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       ...options?.headers,
     },
     ...options,
@@ -79,9 +82,10 @@ export const copiesApi = {
 
 // Checklists API
 export const checklistsApi = {
-  list: (teamId?: string) => {
+  list: (teamId?: string, week?: string) => {
     const params = new URLSearchParams();
     if (teamId) params.append('team_id', teamId);
+    if (week) params.append('week', week);
     const queryString = params.toString();
     return fetchAPI<Checklist[]>(`/api/checklists${queryString ? `?${queryString}` : ''}`);
   },
@@ -156,4 +160,15 @@ export const adPerformanceApi = {
       method: 'POST',
       body: JSON.stringify({ start_week: startWeek, end_week: endWeek, team_ids: teamIds }),
     }),
+};
+
+// Audit Logs API
+export const auditLogsApi = {
+  list: (tableName?: string, limit = 100, offset = 0) => {
+    const params = new URLSearchParams();
+    if (tableName) params.append('table_name', tableName);
+    params.append('limit', String(limit));
+    params.append('offset', String(offset));
+    return fetchAPI<AuditLog[]>(`/api/audit-logs?${params}`);
+  },
 };

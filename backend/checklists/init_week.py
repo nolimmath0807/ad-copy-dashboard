@@ -12,29 +12,30 @@ def get_current_week() -> str:
 
 
 def init_week_checklists(week: str = None):
-    """새 주차의 체크리스트를 초기화 (모든 상품 x 유형 조합)"""
+    """새 주차의 체크리스트를 초기화 (팀별 상품 x 유형 조합)"""
     if week is None:
         week = get_current_week()
 
     client = get_supabase_client()
 
-    # 모든 상품과 유형 조회
-    products = client.table("products").select("id").execute().data
-    copy_types = client.table("copy_types").select("id").execute().data
+    # 팀별 상품 조합과 유형 조회
+    team_products = client.table("team_products").select("team_id, product_id").execute().data
+    copy_types = client.table("copy_types").select("id").is_("parent_id", None).execute().data
 
     # 기존 체크리스트 조회
-    existing = client.table("checklists").select("product_id, copy_type_id").eq("week", week).execute().data
-    existing_pairs = {(item["product_id"], item["copy_type_id"]) for item in existing}
+    existing = client.table("checklists").select("product_id, copy_type_id, team_id").eq("week", week).execute().data
+    existing_triples = {(item["product_id"], item["copy_type_id"], item["team_id"]) for item in existing}
 
     # 누락된 조합만 생성
     new_checklists = []
-    for product in products:
+    for tp in team_products:
         for copy_type in copy_types:
-            pair = (product["id"], copy_type["id"])
-            if pair not in existing_pairs:
+            triple = (tp["product_id"], copy_type["id"], tp["team_id"])
+            if triple not in existing_triples:
                 new_checklists.append({
-                    "product_id": product["id"],
+                    "product_id": tp["product_id"],
                     "copy_type_id": copy_type["id"],
+                    "team_id": tp["team_id"],
                     "status": "pending",
                     "week": week
                 })

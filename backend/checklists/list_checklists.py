@@ -3,7 +3,6 @@ import sys
 sys.path.insert(0, sys.path[0] + "/..")
 
 from conn import get_supabase_client
-from team_products.get_team_products_by_team import get_team_products_by_team
 
 
 def list_checklists(week: str = None, team_id: str = None):
@@ -11,13 +10,8 @@ def list_checklists(week: str = None, team_id: str = None):
     query = client.table("checklists").select("*, products(*), copy_types(*)")
     if week:
         query = query.eq("week", week)
-
     if team_id:
-        product_ids = get_team_products_by_team(team_id)
-        if product_ids:
-            query = query.in_("product_id", product_ids)
-        else:
-            return []
+        query = query.eq("team_id", team_id)
 
     response = query.execute()
     return response.data

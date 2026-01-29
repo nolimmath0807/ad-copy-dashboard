@@ -206,3 +206,15 @@ export interface WeeklyPerformance {
 }
 
 export type WeeklyTeamPerformance = Record<string, Record<string, WeeklyPerformance>>;
+
+// Audit Log
+export interface AuditLog {
+  id: string;
+  user_id: string | null;
+  user_name: string | null;
+  action: 'create' | 'update' | 'delete';
+  table_name: string;
+  record_id: string | null;
+  changes: Record<string, unknown> | null;
+  created_at: string;
+}
