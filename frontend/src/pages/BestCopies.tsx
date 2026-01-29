@@ -73,7 +73,7 @@ export function BestCopies() {
   async function fetchData() {
     setLoading(true);
     try {
-      const checklists = await checklistsApi.list();
+      const checklists = await checklistsApi.listWithUtm();
 
       // 체크리스트에서 UTM 코드별 개별 행 생성
       const utmRows: { utmCode: string; checklist: Checklist }[] = [];

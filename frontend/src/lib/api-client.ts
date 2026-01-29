@@ -92,6 +92,7 @@ export const checklistsApi = {
   stats: () => fetchAPI<ChecklistStats>('/api/checklists/stats'),
   update: (id: string, data: ChecklistUpdate) => fetchAPI<Checklist>(`/api/checklists/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   initWeek: (week?: string) => fetchAPI<Checklist[]>(`/api/checklists/init-week${week ? `?week=${week}` : ''}`, { method: 'POST' }),
+  listWithUtm: () => fetchAPI<Checklist[]>('/api/checklists/with-utm'),
 };
 
 // Best Copies API

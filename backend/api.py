@@ -40,6 +40,7 @@ from checklists.list_checklists import list_checklists
 from checklists.get_stats import get_checklist_stats
 from checklists.update_checklist import update_checklist
 from checklists.init_week import init_week_checklists
+from checklists.list_with_utm import list_checklists_with_utm
 
 # Best Copies
 from best_copies.list_best import list_best_copies
@@ -371,6 +372,11 @@ def api_list_checklists(week: Optional[str] = None, team_id: Optional[str] = Non
 @app.post("/api/checklists/init-week")
 def api_init_week(week: Optional[str] = None):
     return init_week_checklists(week)
+
+
+@app.get("/api/checklists/with-utm")
+def api_list_checklists_with_utm():
+    return list_checklists_with_utm()
 
 
 @app.get("/api/checklists/stats")

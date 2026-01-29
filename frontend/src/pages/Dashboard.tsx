@@ -39,7 +39,7 @@ export function Dashboard() {
           productsApi.list(),
           copyTypesApi.list(),
           copiesApi.list(),
-          checklistsApi.list(),
+          checklistsApi.list(undefined, currentWeek),
           teamsApi.list(),
         ]);
         setProducts(productsData);
@@ -76,7 +76,7 @@ export function Dashboard() {
   const parentCopyTypes = copyTypes.filter(ct => ct.parent_id === null);
 
   // 이번 주 전체 체크리스트 완료율 (UTM 입력 기준)
-  const weekChecklists = allChecklists.filter(c => c.week === currentWeek);
+  const weekChecklists = allChecklists;
   const weekFilledCount = weekChecklists.filter(c => c.utm_code && c.utm_code !== '[]').length;
   const weekTotalCount = weekChecklists.length;
   const weekCompletionRate = weekTotalCount > 0 ? Math.round((weekFilledCount / weekTotalCount) * 100) : 0;
