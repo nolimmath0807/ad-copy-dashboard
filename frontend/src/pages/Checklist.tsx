@@ -47,11 +47,13 @@ function getPreviousWeek(week: string): string {
   return `${year}-W${(weekNum - 1).toString().padStart(2, '0')}`;
 }
 
-// 최근 N주 목록 생성
-function getRecentWeeks(count: number): string[] {
+// 서비스 시작 주차부터 현재까지의 주차 목록 생성
+const SERVICE_START_WEEK = '2026-W05';
+
+function getWeeksFromStart(startWeek: string): string[] {
   const weeks: string[] = [];
   let current = getCurrentWeek();
-  for (let i = 0; i < count; i++) {
+  while (current >= startWeek) {
     weeks.push(current);
     current = getPreviousWeek(current);
   }
@@ -107,7 +109,7 @@ export function Checklist() {
   const [utmData, setUtmData] = useState<Record<string, string[]>>({});
   const [newUtmInput, setNewUtmInput] = useState<Record<string, string>>({});
 
-  const recentWeeks = getRecentWeeks(8);
+  const recentWeeks = getWeeksFromStart(SERVICE_START_WEEK);
   const isAdminOrLeader = user?.role === 'admin' || user?.role === 'leader';
   const [isInitialized, setIsInitialized] = useState(false);
 
@@ -167,7 +169,20 @@ export function Checklist() {
       setCopyTypes(copyTypesData);
 
       // 선택한 주차 데이터만 필터링
-      const filteredChecklists = checklistsData.filter((c: any) => c.week === selectedWeek);
+      let filteredChecklists = checklistsData.filter((c: any) => c.week === selectedWeek);
+
+      // 해당 주차에 체크리스트 데이터가 없으면 자동 생성
+      if (filteredChecklists.length === 0 && productsData.length > 0 && copyTypesData.length > 0) {
+        try {
+          console.log('[Checklist] Auto-initializing week:', selectedWeek);
+          await checklistsApi.initWeek(selectedWeek);
+          const refreshedData = await checklistsApi.list(selectedTeamId);
+          filteredChecklists = refreshedData.filter((c: any) => c.week === selectedWeek);
+        } catch (err) {
+          console.error('[Checklist] Failed to auto-init week:', err);
+        }
+      }
+
       setChecklists(filteredChecklists);
 
       // UTM 데이터 초기화 (배열로 파싱)

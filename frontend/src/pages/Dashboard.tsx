@@ -2,30 +2,56 @@ import { useEffect, useState } from 'react';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { productsApi, copyTypesApi, checklistsApi, copiesApi } from '@/lib/api-client';
-import { Package, FileText, CheckCircle, BarChart3 } from 'lucide-react';
-import type { Product, CopyType, ChecklistStats, GeneratedCopy } from '@/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { productsApi, copyTypesApi, checklistsApi, copiesApi, teamsApi, teamProductsApi } from '@/lib/api-client';
+import { useAuth } from '@/contexts/AuthContext';
+import { FileText, CheckCircle, BarChart3, Info, Users } from 'lucide-react';
+import type { Product, CopyType, GeneratedCopy, Team, Checklist as ChecklistType } from '@/types';
+
+// 현재 주차 계산
+function getCurrentWeek(): string {
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const days = Math.floor((now.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
+  const weekNumber = Math.ceil((days + startOfYear.getDay() + 1) / 7);
+  return `${now.getFullYear()}-W${weekNumber.toString().padStart(2, '0')}`;
+}
 
 export function Dashboard() {
+  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [copyTypes, setCopyTypes] = useState<CopyType[]>([]);
-  const [stats, setStats] = useState<ChecklistStats | null>(null);
   const [allCopies, setAllCopies] = useState<GeneratedCopy[]>([]);
+  const [allChecklists, setAllChecklists] = useState<ChecklistType[]>([]);
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [selectedTeamId, setSelectedTeamId] = useState<string | undefined>(undefined);
+  const [teamProductIds, setTeamProductIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const isAdminOrLeader = user?.role === 'admin' || user?.role === 'leader';
+  const currentWeek = getCurrentWeek();
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [productsData, copyTypesData, statsData, copiesData] = await Promise.all([
+        const [productsData, copyTypesData, copiesData, checklistsData, teamsData] = await Promise.all([
           productsApi.list(),
           copyTypesApi.list(),
-          checklistsApi.stats(),
           copiesApi.list(),
+          checklistsApi.list(),
+          teamsApi.list(),
         ]);
         setProducts(productsData);
         setCopyTypes(copyTypesData);
-        setStats(statsData);
         setAllCopies(copiesData);
+        setAllChecklists(checklistsData);
+        setTeams(teamsData);
+
+        // Set initial team for non-admin
+        if (!isAdminOrLeader && user?.team_id) {
+          setSelectedTeamId(user.team_id);
+        }
       } catch (error) {
         console.error('Failed to fetch data:', error);
       } finally {
@@ -35,23 +61,45 @@ export function Dashboard() {
     fetchData();
   }, []);
 
+  // Fetch team products when selectedTeamId changes
+  useEffect(() => {
+    if (selectedTeamId) {
+      teamProductsApi.list(selectedTeamId).then((data) => {
+        setTeamProductIds(data.map((tp: any) => tp.product_id));
+      });
+    } else {
+      setTeamProductIds([]);
+    }
+  }, [selectedTeamId]);
+
   // 부모 유형만 필터링
   const parentCopyTypes = copyTypes.filter(ct => ct.parent_id === null);
 
+  // 이번 주 전체 체크리스트 완료율 (UTM 입력 기준)
+  const weekChecklists = allChecklists.filter(c => c.week === currentWeek);
+  const weekFilledCount = weekChecklists.filter(c => c.utm_code && c.utm_code !== '[]').length;
+  const weekTotalCount = weekChecklists.length;
+  const weekCompletionRate = weekTotalCount > 0 ? Math.round((weekFilledCount / weekTotalCount) * 100) : 0;
+
+  // 팀별 체크리스트 완수율
+  const teamWeekChecklists = selectedTeamId && teamProductIds.length > 0
+    ? weekChecklists.filter(c => teamProductIds.includes(c.product_id))
+    : [];
+  const teamFilledCount = teamWeekChecklists.filter(c => c.utm_code && c.utm_code !== '[]').length;
+  const teamTotalCount = teamWeekChecklists.length;
+  const teamCompletionRate = teamTotalCount > 0 ? Math.round((teamFilledCount / teamTotalCount) * 100) : 0;
+
   // 상품 × 유형별 생성 횟수 계산
   function getGenerationCount(productId: string, copyTypeId: string): number {
-    // 해당 유형의 자식들 ID도 포함
     const childTypeIds = copyTypes
       .filter(ct => ct.parent_id === copyTypeId)
       .map(ct => ct.id);
     const allTypeIds = [copyTypeId, ...childTypeIds];
-
     return allCopies.filter(
       copy => copy.product_id === productId && allTypeIds.includes(copy.copy_type_id)
     ).length;
   }
 
-  // 총 생성 횟수
   const totalGenerations = allCopies.length;
 
   if (loading) {
@@ -69,15 +117,42 @@ export function Dashboard() {
       <div className="p-6 space-y-6">
         {/* 통계 카드 */}
         <div className="grid grid-cols-4 gap-4">
+          {/* 팀별 완수율 카드 */}
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">상품 수</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
+              <CardTitle className="text-sm font-medium">
+                {isAdminOrLeader ? '팀별 완수율' : '내 팀 완수율'}
+              </CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{products.length}</div>
+              {isAdminOrLeader && (
+                <Select value={selectedTeamId || ''} onValueChange={(value) => setSelectedTeamId(value || undefined)}>
+                  <SelectTrigger className="w-full h-8 text-xs mb-2">
+                    <SelectValue placeholder="팀 선택" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams.map(team => (
+                      <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {selectedTeamId ? (
+                <>
+                  <div className="text-2xl font-bold">{teamCompletionRate}%</div>
+                  <p className="text-xs text-muted-foreground">
+                    {teamFilledCount} / {teamTotalCount} 셀 입력
+                  </p>
+                </>
+              ) : (
+                <div className="text-sm text-muted-foreground">
+                  {isAdminOrLeader ? '팀을 선택하세요' : '-'}
+                </div>
+              )}
             </CardContent>
           </Card>
+
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
               <CardTitle className="text-sm font-medium">원고 유형</CardTitle>
@@ -101,13 +176,25 @@ export function Dashboard() {
           </Card>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">체크리스트 완료율</CardTitle>
+              <div className="flex items-center gap-1">
+                <CardTitle className="text-sm font-medium">전체 팀 기준 체크리스트 완료율</CardTitle>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button className="text-muted-foreground hover:text-foreground transition-colors">
+                      <Info className="h-3.5 w-3.5" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64 text-sm" side="bottom">
+                    이번 주 체크리스트의 전체 셀 중 UTM 코드가 입력된 셀의 비율입니다.
+                  </PopoverContent>
+                </Popover>
+              </div>
               <CheckCircle className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stats?.completion_rate || 0}%</div>
+              <div className="text-2xl font-bold">{weekCompletionRate}%</div>
               <p className="text-xs text-muted-foreground">
-                {stats?.completed || 0} / {stats?.total || 0} 완료
+                {weekFilledCount} / {weekTotalCount} 셀 입력
               </p>
             </CardContent>
           </Card>
@@ -117,7 +204,7 @@ export function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle>상품별 원고 생성 현황</CardTitle>
-            <p className="text-sm text-muted-foreground">각 셀은 해당 상품 × 유형 조합의 원고 생성 횟수입니다</p>
+            <p className="text-sm text-muted-foreground">각 셀은 해당 상품 x 유형 조합의 원고 생성 횟수입니다</p>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
