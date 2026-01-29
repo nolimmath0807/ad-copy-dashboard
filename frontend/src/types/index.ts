@@ -90,7 +90,9 @@ export interface Checklist {
   utm_code: string | null;
   updated_at: string;
   products?: Product;
+  product?: Product;
   copy_types?: CopyType;
+  copy_type?: CopyType;
 }
 
 export interface ChecklistUpdate {

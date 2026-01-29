@@ -212,14 +212,14 @@ export function BestCopies() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        {row.checklist.products && (
+                        {(row.checklist.product || row.checklist.products) && (
                           <Badge variant="outline">
-                            {row.checklist.products.name}
+                            {(row.checklist.product || row.checklist.products)!.name}
                           </Badge>
                         )}
-                        {row.checklist.copy_types && (
+                        {(row.checklist.copy_type || row.checklist.copy_types) && (
                           <Badge variant="secondary">
-                            {row.checklist.copy_types.code}
+                            {(row.checklist.copy_type || row.checklist.copy_types)!.code}
                           </Badge>
                         )}
                       </div>
