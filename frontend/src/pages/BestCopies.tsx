@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { adPerformanceApi, checklistsApi } from '@/lib/api-client';
 import type { AdPerformance, Checklist } from '@/types';
-import { Trophy, TrendingUp } from 'lucide-react';
+import { Trophy } from 'lucide-react';
 
 function generateMonthOptions() {
   const options: string[] = [];
@@ -50,18 +50,14 @@ function parseUtmCodes(utmCode: string | null): string[] {
   return [];
 }
 
-interface ChecklistWithPerf {
+interface UtmPerformanceRow {
+  utmCode: string;
   checklist: Checklist;
-  utmCodes: string[];
-  spend: number;
-  impressions: number;
-  clicks: number;
-  ctr: number;
-  hasPerf: boolean;
+  perf: AdPerformance | null;
 }
 
 export function BestCopies() {
-  const [items, setItems] = useState<ChecklistWithPerf[]>([]);
+  const [rows, setRows] = useState<UtmPerformanceRow[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -79,54 +75,39 @@ export function BestCopies() {
     try {
       const checklists = await checklistsApi.list();
 
-      // UTM 코드가 있는 체크리스트만 필터링
-      const withUtm = checklists
-        .map(cl => ({ checklist: cl, utmCodes: parseUtmCodes(cl.utm_code) }))
-        .filter(item => item.utmCodes.length > 0);
+      // 체크리스트에서 UTM 코드별 개별 행 생성
+      const utmRows: { utmCode: string; checklist: Checklist }[] = [];
+      for (const cl of checklists) {
+        const codes = parseUtmCodes(cl.utm_code);
+        for (const code of codes) {
+          utmRows.push({ utmCode: code, checklist: cl });
+        }
+      }
 
-      // 모든 UTM 코드 수집
-      const allUtmCodes = [...new Set(withUtm.flatMap(item => item.utmCodes))];
+      const uniqueUtmCodes = [...new Set(utmRows.map(r => r.utmCode))];
 
       let perfData: Record<string, AdPerformance> = {};
-      if (allUtmCodes.length > 0) {
+      if (uniqueUtmCodes.length > 0) {
         try {
-          perfData = await adPerformanceApi.getByUtmCodes(allUtmCodes, selectedMonth);
+          perfData = await adPerformanceApi.getByUtmCodes(uniqueUtmCodes, selectedMonth);
         } catch {
           perfData = {};
         }
       }
 
-      // 체크리스트별 성과 집계
-      const result: ChecklistWithPerf[] = withUtm.map(({ checklist, utmCodes }) => {
-        let spend = 0;
-        let impressions = 0;
-        let clicks = 0;
-        let hasPerf = false;
+      // 각 UTM 코드에 성과 매핑
+      const result: UtmPerformanceRow[] = utmRows.map(row => ({
+        ...row,
+        perf: perfData[row.utmCode] || null,
+      }));
 
-        for (const utm of utmCodes) {
-          const p = perfData[utm];
-          if (p) {
-            spend += p.spend;
-            impressions += p.impressions;
-            clicks += p.clicks;
-            hasPerf = true;
-          }
-        }
-
-        const ctr = impressions > 0
-          ? Math.round((clicks / impressions) * 10000) / 100
-          : 0;
-
-        return { checklist, utmCodes, spend, impressions, clicks, ctr, hasPerf };
-      });
-
-      // 광고비 내림차순 정렬 (성과 있는 것 우선)
+      // 광고비 내림차순 (성과 있는 것 우선)
       result.sort((a, b) => {
-        if (a.hasPerf !== b.hasPerf) return a.hasPerf ? -1 : 1;
-        return b.spend - a.spend;
+        if (!!a.perf !== !!b.perf) return a.perf ? -1 : 1;
+        return (b.perf?.spend || 0) - (a.perf?.spend || 0);
       });
 
-      setItems(result);
+      setRows(result);
     } catch (error) {
       console.error('Failed to fetch data:', error);
     } finally {
@@ -134,9 +115,10 @@ export function BestCopies() {
     }
   }
 
-  const totalSpend = items.reduce((sum, item) => sum + item.spend, 0);
-  const totalImpressions = items.reduce((sum, item) => sum + item.impressions, 0);
-  const totalClicks = items.reduce((sum, item) => sum + item.clicks, 0);
+  const rowsWithPerf = rows.filter(r => r.perf);
+  const totalSpend = rowsWithPerf.reduce((sum, r) => sum + (r.perf?.spend || 0), 0);
+  const totalImpressions = rowsWithPerf.reduce((sum, r) => sum + (r.perf?.impressions || 0), 0);
+  const totalClicks = rowsWithPerf.reduce((sum, r) => sum + (r.perf?.clicks || 0), 0);
   const totalCtr = totalImpressions > 0
     ? Math.round((totalClicks / totalImpressions) * 10000) / 100
     : 0;
@@ -193,34 +175,34 @@ export function BestCopies() {
           </Card>
         </div>
 
-        {/* 소재별 성과 목록 */}
+        {/* UTM 코드별 성과 목록 */}
         <Card>
           <CardHeader>
-            <CardTitle>소재별 성과</CardTitle>
+            <CardTitle>UTM 코드별 성과</CardTitle>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="py-8 text-center text-muted-foreground">로딩 중...</div>
-            ) : items.length === 0 ? (
+            ) : rows.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">
                 UTM 코드가 등록된 소재가 없습니다
               </div>
             ) : (
-              <div className="space-y-4">
-                {items.map((item, index) => (
+              <div className="space-y-3">
+                {rows.map((row, index) => (
                   <div
-                    key={item.checklist.id}
+                    key={`${row.checklist.id}-${row.utmCode}`}
                     className="flex items-start gap-4 p-4 rounded-lg border bg-card"
                   >
                     <div className="flex-shrink-0">
                       <Badge
-                        variant={index < 3 && item.hasPerf ? 'default' : 'secondary'}
+                        variant={index < 3 && row.perf ? 'default' : 'secondary'}
                         className={
-                          index === 0 && item.hasPerf
+                          index === 0 && row.perf
                             ? 'bg-yellow-500 hover:bg-yellow-600'
-                            : index === 1 && item.hasPerf
+                            : index === 1 && row.perf
                             ? 'bg-gray-400 hover:bg-gray-500'
-                            : index === 2 && item.hasPerf
+                            : index === 2 && row.perf
                             ? 'bg-amber-600 hover:bg-amber-700'
                             : ''
                         }
@@ -229,37 +211,33 @@ export function BestCopies() {
                       </Badge>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        {item.checklist.products && (
+                      <div className="flex items-center gap-2 mb-1">
+                        {row.checklist.products && (
                           <Badge variant="outline">
-                            {item.checklist.products.name}
+                            {row.checklist.products.name}
                           </Badge>
                         )}
-                        {item.checklist.copy_types && (
+                        {row.checklist.copy_types && (
                           <Badge variant="secondary">
-                            {item.checklist.copy_types.code}
+                            {row.checklist.copy_types.code}
                           </Badge>
                         )}
                       </div>
-                      <div className="flex flex-wrap gap-1">
-                        {item.utmCodes.map(utm => (
-                          <span key={utm} className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                            {utm}
-                          </span>
-                        ))}
-                      </div>
+                      <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                        {row.utmCode}
+                      </span>
                     </div>
                     <div className="flex-shrink-0 text-right space-y-1">
-                      {item.hasPerf ? (
+                      {row.perf ? (
                         <>
                           <p className="text-lg font-bold text-primary">
-                            {formatCurrency(item.spend)}
+                            {formatCurrency(row.perf.spend)}
                           </p>
                           <p className="text-xs text-muted-foreground">광고비</p>
                           <div className="text-xs text-muted-foreground space-y-0.5 pt-1 border-t">
-                            <p>노출 {item.impressions.toLocaleString()}</p>
-                            <p>클릭 {item.clicks.toLocaleString()}</p>
-                            <p>CTR {item.ctr}%</p>
+                            <p>노출 {row.perf.impressions.toLocaleString()}</p>
+                            <p>클릭 {row.perf.clicks.toLocaleString()}</p>
+                            <p>CTR {row.perf.ctr}%</p>
                           </div>
                         </>
                       ) : (
