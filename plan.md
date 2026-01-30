@@ -1,109 +1,60 @@
-# 회원가입/인증 시스템 구현
+# DB 스키마 이름 변경: ad-copy-dashboard → ad_copy_dashboard
 
 ## Overview
-Supabase Auth를 활용한 회원가입/로그인 시스템 구축. 팀 목록은 DB에서 관리하여 동적으로 추가/수정 가능. 관리자 승인 후 서비스 이용 가능.
-
-## Database Schema (Supabase SQL Editor)
-```sql
--- 팀 테이블 (동적 관리)
-CREATE TABLE public.teams (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL UNIQUE,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-
--- 초기 팀 데이터
-INSERT INTO teams (name) VALUES
-  ('퍼포AI 1팀'),
-  ('퍼포AI 2팀'),
-  ('퍼포AI 3팀'),
-  ('퍼포AI 4팀'),
-  ('구글팀');
-
--- 사용자 테이블
-CREATE TABLE public.users (
-  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  email TEXT NOT NULL,
-  name TEXT NOT NULL,
-  team_id UUID REFERENCES teams(id),
-  is_approved BOOLEAN DEFAULT FALSE,
-  is_admin BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP DEFAULT NOW()
-);
-```
+PostgreSQL 스키마 이름을 `ad-copy-dashboard`에서 `ad_copy_dashboard`로 변경한다. 하이픈이 포함된 식별자는 SQL에서 항상 따옴표가 필요하므로, 언더스코어로 교체하여 사용 편의성을 높인다.
 
 ## Key Files
 | File | Action | Description |
 |------|--------|-------------|
-| `backend/auth/register.py` | Create | 회원가입 처리 |
-| `backend/auth/login.py` | Create | 로그인 처리 |
-| `backend/auth/me.py` | Create | 현재 사용자 정보 조회 |
-| `backend/auth/approve.py` | Create | 관리자 승인 처리 |
-| `backend/auth/list_users.py` | Create | 사용자 목록 조회 (관리자) |
-| `backend/teams/list_teams.py` | Create | 팀 목록 조회 |
-| `backend/teams/create_team.py` | Create | 팀 추가 (관리자) |
-| `backend/teams/delete_team.py` | Create | 팀 삭제 (관리자) |
-| `backend/api.py` | Modify | Auth + Teams 엔드포인트 추가 |
-| `frontend/src/pages/Login.tsx` | Create | 로그인 페이지 |
-| `frontend/src/pages/Register.tsx` | Create | 회원가입 페이지 |
-| `frontend/src/pages/Pending.tsx` | Create | 승인 대기 페이지 |
-| `frontend/src/pages/AdminUsers.tsx` | Create | 사용자 승인 관리 |
-| `frontend/src/pages/AdminTeams.tsx` | Create | 팀 관리 페이지 |
-| `frontend/src/contexts/AuthContext.tsx` | Create | 인증 상태 관리 |
-| `frontend/src/components/ProtectedRoute.tsx` | Create | 인증 보호 라우트 |
-| `frontend/src/App.tsx` | Modify | 라우팅 + 인증 보호 |
-| `frontend/src/types/index.ts` | Modify | User, Team 타입 추가 |
-| `frontend/src/lib/api-client.ts` | Modify | Auth, Teams API 추가 |
+| `backend/migrate_schema_name.py` | Create | ALTER SCHEMA RENAME 마이그레이션 스크립트 |
+| `backend/.env` | Modify | DB_SCHEMA 값 변경 |
+| `backend/migrate_role.py` | Modify | 하드코딩된 스키마 이름 변경 |
 
 ## Implementation Steps
 
-### Phase 1: Backend - Auth & Teams API
-1. **teams 모듈 생성** - list_teams.py, create_team.py, delete_team.py
-2. **auth 모듈 생성** - register.py, login.py, me.py, approve.py, list_users.py
-3. **api.py 수정** - Auth, Teams 엔드포인트 추가
+### Phase 1: DB 마이그레이션 스크립트
+1. **migrate_schema_name.py 생성**
+   - `ALTER SCHEMA "ad-copy-dashboard" RENAME TO ad_copy_dashboard;` 실행
+   - dry-run 옵션 지원
+   - 기존 `db.py`의 `get_connection()` 활용
+   - Related file: `backend/migrate_schema_name.py`
 
-### Phase 2: Frontend - Auth UI
-4. **types/index.ts 수정** - User, Team 인터페이스 추가
-5. **api-client.ts 수정** - authApi, teamsApi 추가
-6. **AuthContext.tsx 생성** - 인증 상태 관리
-7. **ProtectedRoute.tsx 생성** - 인증 보호 컴포넌트
-8. **Login.tsx 생성** - 로그인 페이지
-9. **Register.tsx 생성** - 회원가입 페이지 (팀 선택)
-10. **Pending.tsx 생성** - 승인 대기 페이지
+### Phase 2: 코드 참조 변경 (병렬)
+2. **backend/.env 수정**
+   - `DB_SCHEMA=ad-copy-dashboard` → `DB_SCHEMA=ad_copy_dashboard`
+   - Related file: `backend/.env`
 
-### Phase 3: Frontend - Admin UI
-11. **AdminUsers.tsx 생성** - 사용자 승인 관리
-12. **AdminTeams.tsx 생성** - 팀 관리 페이지
-13. **App.tsx 수정** - 라우팅 구조 변경
-14. **Sidebar.tsx 수정** - 관리자 메뉴 추가
+3. **migrate_role.py 수정**
+   - `schema = '"ad-copy-dashboard"'` → `schema = 'ad_copy_dashboard'`
+   - 따옴표 불필요해지므로 단순화
+   - Related file: `backend/migrate_role.py`
 
-## 인증 플로우
-1. 사용자 회원가입 (이메일, 비밀번호, 이름, 팀 선택)
-2. Supabase Auth 계정 생성 + users 테이블 저장
-3. is_approved = false 상태로 대기
-4. 관리자가 AdminUsers 페이지에서 승인
-5. 승인된 사용자만 서비스 이용 가능
+## Parallel Execution Plan
 
-## 페이지 접근 권한
-| 페이지 | 비로그인 | 미승인 | 승인됨 | 관리자 |
-|--------|---------|--------|--------|--------|
-| /login | ✅ | ❌ | ❌ | ❌ |
-| /register | ✅ | ❌ | ❌ | ❌ |
-| /pending | ❌ | ✅ | ❌ | ❌ |
-| 일반 페이지 | ❌ | ❌ | ✅ | ✅ |
-| /admin/* | ❌ | ❌ | ❌ | ✅ |
+### Summary
+| Phase | Tasks | Parallel | Sequential |
+|-------|-------|----------|------------|
+| Phase 1: DB Migration | 1 | 1 | 0 |
+| Phase 2: Code References | 2 | 2 | 0 |
+| **Total** | **3** | **3** | **0** |
 
-## Dependencies
-- @supabase/supabase-js (Frontend - Supabase Auth 클라이언트)
+### Phase 1: DB Migration
+**Purpose:** DB 스키마 이름 변경 마이그레이션 스크립트 생성
+**Dependencies:** None
 
-## API Endpoints
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | /api/auth/register | 회원가입 |
-| POST | /api/auth/login | 로그인 |
-| GET | /api/auth/me | 현재 사용자 정보 |
-| GET | /api/auth/users | 사용자 목록 (관리자) |
-| PUT | /api/auth/approve/{id} | 사용자 승인 (관리자) |
-| GET | /api/teams | 팀 목록 |
-| POST | /api/teams | 팀 추가 (관리자) |
-| DELETE | /api/teams/{id} | 팀 삭제 (관리자) |
+| Task | Description | Parallel |
+|------|-------------|----------|
+| T001 | migrate_schema_name.py 생성 | Yes |
+
+### Phase 2: Code References
+**Purpose:** 코드에서 참조하는 스키마 이름 업데이트
+**Dependencies:** Phase 1
+
+| Task | Description | Parallel |
+|------|-------------|----------|
+| T002 | backend/.env DB_SCHEMA 값 변경 | Yes |
+| T003 | migrate_role.py 스키마 이름 변경 | Yes |
+
+## Risks & Mitigations
+- **DB 연결 중단**: 마이그레이션은 dry-run으로 먼저 검증 후 실행
+- **기존 세션 영향**: search_path가 구 스키마를 참조할 수 있으므로 마이그레이션 후 앱 재시작 필요

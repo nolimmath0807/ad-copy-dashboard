@@ -6,7 +6,7 @@ def main(dry_run: bool = False):
     conn = get_connection()
     conn.autocommit = False
     cur = conn.cursor()
-    schema = '"ad-copy-dashboard"'
+    schema = 'ad_copy_dashboard'
 
     print("[1/4] Adding role column to users table...")
     cur.execute(f"""
