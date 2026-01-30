@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { productsApi, copyTypesApi, checklistsApi, teamsApi, teamProductsApi } from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
-import { AlertTriangle, Check, X, Plus } from 'lucide-react';
+import { AlertTriangle, Ban, Check, X, Plus, RefreshCw } from 'lucide-react';
 import type { Product, CopyType, Checklist as ChecklistType, Team } from '@/types';
 
 // UTM 코드 문자열을 배열로 파싱 (기존 단일 문자열도 호환)
@@ -111,6 +111,7 @@ export function Checklist() {
 
   const recentWeeks = getWeeksFromStart(SERVICE_START_WEEK);
   const isAdminOrLeader = user?.role === 'admin' || user?.role === 'leader';
+  const isAllTeamsView = isAdminOrLeader && !selectedTeamId;
   const [isInitialized, setIsInitialized] = useState(false);
 
   // Initialize selectedTeamId based on user role
@@ -146,7 +147,7 @@ export function Checklist() {
         productsApi.list(),
         copyTypesApi.list(),
         checklistsApi.list(selectedTeamId, selectedWeek),
-        selectedTeamId ? teamProductsApi.list(selectedTeamId) : Promise.resolve([]),
+        teamProductsApi.list(selectedTeamId),
       ]);
 
       console.log('[Checklist] allProducts:', allProductsData.length);
@@ -154,13 +155,12 @@ export function Checklist() {
 
       // 팀이 선택된 경우 해당 팀에 할당된 상품만 필터링
       let productsData = allProductsData;
-      if (selectedTeamId && teamProductsData.length > 0) {
-        const assignedProductIds = teamProductsData.map((tp: any) => tp.product_id);
+      if (teamProductsData.length > 0) {
+        const assignedProductIds = [...new Set(teamProductsData.map((tp: any) => tp.product_id))];
         console.log('[Checklist] assignedProductIds:', assignedProductIds);
         productsData = allProductsData.filter((p: any) => assignedProductIds.includes(p.id));
         console.log('[Checklist] filtered products:', productsData.length);
-      } else if (selectedTeamId && teamProductsData.length === 0) {
-        // 팀에 할당된 상품이 없으면 빈 배열
+      } else if (selectedTeamId) {
         productsData = [];
         console.log('[Checklist] no products assigned to team');
       }
@@ -210,6 +210,28 @@ export function Checklist() {
       console.error('Failed to fetch data:', error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleBulkToggleExcluded(checklistIds: string[], exclude: boolean) {
+    try {
+      await Promise.all(checklistIds.map(id => checklistsApi.update(id, { excluded: exclude })));
+      setChecklists(prev => prev.map(c =>
+        checklistIds.includes(c.id) ? { ...c, excluded: exclude } : c
+      ));
+    } catch (error) {
+      console.error('Failed to bulk toggle excluded:', error);
+    }
+  }
+
+  async function handleToggleExcluded(checklistId: string, currentExcluded: boolean) {
+    try {
+      await checklistsApi.update(checklistId, { excluded: !currentExcluded });
+      setChecklists(prev => prev.map(c =>
+        c.id === checklistId ? { ...c, excluded: !currentExcluded } : c
+      ));
+    } catch (error) {
+      console.error('Failed to toggle excluded:', error);
     }
   }
 
@@ -272,10 +294,22 @@ export function Checklist() {
   // 부모 유형만 필터링 (parent_id가 null인 것)
   const parentCopyTypes = copyTypes.filter(ct => ct.parent_id === null);
 
-  // 완료율 계산 (UTM 코드가 1개 이상인 것)
-  const completedCount = checklists.filter(c => parseUtmCodes(c.utm_code).length > 0).length;
-  const totalCount = checklists.length;
+  // 완료율 계산 (제외 항목 빼고)
+  const excludedCount = checklists.filter(c => c.excluded).length;
+  const activeChecklists = checklists.filter(c => !c.excluded);
+  const completedCount = activeChecklists.filter(c => parseUtmCodes(c.utm_code).length > 0).length;
+  const autoCarryCount = activeChecklists.filter(c => c.notes === 'auto-carry').length;
+  const totalCount = activeChecklists.length;
   const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+  // 전체 뷰용 팀별 통계
+  const teamStats = isAllTeamsView ? teams.map(team => {
+    const teamChecklists = checklists.filter(c => (c as any).team_id === team.id && !c.excluded);
+    const teamCompleted = teamChecklists.filter(c => parseUtmCodes(c.utm_code).length > 0).length;
+    const teamTotal = teamChecklists.length;
+    const teamRate = teamTotal > 0 ? Math.round((teamCompleted / teamTotal) * 100) : 0;
+    return { team, completed: teamCompleted, total: teamTotal, rate: teamRate };
+  }) : [];
 
   if (loading) return <><Header title="체크리스트" /><div className="p-6">로딩 중...</div></>;
 
@@ -330,14 +364,47 @@ export function Checklist() {
             </div>
             <div className="flex gap-4 text-sm text-muted-foreground">
               <span>완료 (UTM 입력): {completedCount}</span>
+              <span className="text-blue-600">자동 이월: {autoCarryCount}</span>
               <span>미입력: {totalCount - completedCount}</span>
               <span>전체: {totalCount}</span>
+              {excludedCount > 0 && <span className="text-gray-400">제외: {excludedCount}개</span>}
             </div>
           </CardContent>
         </Card>
 
         {/* 매트릭스: 유형(행) × 상품(열) - UTM 입력 */}
-        <Card>
+        {isAllTeamsView ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>팀별 체크리스트 현황</CardTitle>
+              <p className="text-sm text-muted-foreground">팀을 선택하면 상세 매트릭스를 확인할 수 있습니다.</p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {teamStats.map(({ team, completed, total, rate }) => (
+                  <button
+                    key={team.id}
+                    onClick={() => setSelectedTeamId(team.id)}
+                    className="text-left p-4 border rounded-lg hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="font-medium mb-2">{team.name}</div>
+                    <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-2">
+                      <div
+                        className="h-full bg-green-500 transition-all duration-500"
+                        style={{ width: `${rate}%` }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>{completed}/{total} 완료</span>
+                      <span className="font-bold">{rate}%</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
           <CardHeader>
             <CardTitle>원고 유형 × 상품 매트릭스</CardTitle>
             <p className="text-sm text-muted-foreground">각 셀에 UTM 코드를 입력하세요. 입력 후 Enter 또는 포커스 아웃 시 저장됩니다.</p>
@@ -348,18 +415,54 @@ export function Checklist() {
                 <thead>
                   <tr>
                     <th className="border px-4 py-3 bg-muted text-left min-w-48">원고 유형</th>
-                    {products.map(product => (
-                      <th key={product.id} className="border px-4 py-3 bg-muted text-center min-w-36">
-                        {product.name}
-                      </th>
-                    ))}
+                    {products.map(product => {
+                      const productChecklists = checklists.filter(c => c.product_id === product.id);
+                      const allExcluded = productChecklists.length > 0 && productChecklists.every(c => c.excluded);
+                      return (
+                        <th key={product.id} className="border px-4 py-3 bg-muted text-center min-w-36">
+                          <div className="flex items-center justify-center gap-1">
+                            {product.name}
+                            {isAdminOrLeader && productChecklists.length > 0 && (
+                              <button
+                                onClick={() => {
+                                  const ids = productChecklists.map(c => c.id);
+                                  handleBulkToggleExcluded(ids, !allExcluded);
+                                }}
+                                className={`shrink-0 p-0.5 rounded hover:bg-muted-foreground/10 transition-colors ${allExcluded ? 'text-red-400' : 'text-gray-400 hover:text-red-500'}`}
+                                title={allExcluded ? '이 상품 전체 제외 해제' : '이 상품 전체 제외'}
+                              >
+                                <Ban className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </th>
+                      );
+                    })}
                   </tr>
                 </thead>
                 <tbody>
                   {parentCopyTypes.map(copyType => (
                     <tr key={copyType.id}>
                       <td className="border px-4 py-3">
-                        <div className="font-medium mb-1">[{copyType.code}] {copyType.name}</div>
+                        <div className="flex items-center gap-1 font-medium mb-1">
+                          [{copyType.code}] {copyType.name}
+                          {isAdminOrLeader && (() => {
+                            const rowChecklists = checklists.filter(c => c.copy_type_id === copyType.id);
+                            const allExcluded = rowChecklists.length > 0 && rowChecklists.every(c => c.excluded);
+                            return rowChecklists.length > 0 ? (
+                              <button
+                                onClick={() => {
+                                  const ids = rowChecklists.map(c => c.id);
+                                  handleBulkToggleExcluded(ids, !allExcluded);
+                                }}
+                                className={`shrink-0 p-0.5 rounded hover:bg-muted-foreground/10 transition-colors ${allExcluded ? 'text-red-400' : 'text-gray-400 hover:text-red-500'}`}
+                                title={allExcluded ? '이 유형 전체 제외 해제' : '이 유형 전체 제외'}
+                              >
+                                <Ban className="w-3 h-3" />
+                              </button>
+                            ) : null;
+                          })()}
+                        </div>
                         <div className="text-xs text-muted-foreground leading-relaxed">{copyType.core_concept}</div>
                       </td>
                       {products.map(product => {
@@ -367,6 +470,8 @@ export function Checklist() {
                         const key = getInputKey(product.id, copyType.id);
                         const codes = getUtmCodes(product.id, copyType.id);
                         const hasUtm = codes.length > 0;
+                        const isAutoCarry = checklist?.notes === 'auto-carry';
+                        const isExcluded = checklist?.excluded === true;
 
                         // 셀 표시 텍스트
                         const displayText = codes.length === 0
@@ -376,21 +481,33 @@ export function Checklist() {
                             : `${codes[0]} 외 ${codes.length - 1}개`;
 
                         return (
-                          <td key={product.id} className="border px-2 py-2">
+                          <td key={product.id} className={`border px-2 py-2 ${isExcluded ? 'opacity-40 bg-gray-50' : ''}`}>
                             {checklist ? (
+                              <div className="flex items-center gap-1">
+                              {isAdminOrLeader && (
+                                <button
+                                  onClick={() => handleToggleExcluded(checklist.id, !!checklist.excluded)}
+                                  className={`shrink-0 p-0.5 rounded hover:bg-muted transition-colors ${isExcluded ? 'text-red-500' : 'text-gray-300 hover:text-gray-500'}`}
+                                  title={isExcluded ? '제외 해제' : '제외 처리'}
+                                >
+                                  <Ban className="h-3.5 w-3.5" />
+                                </button>
+                              )}
                               <Popover>
                                 <PopoverTrigger asChild>
                                   <button
                                     className={`w-full text-left text-xs px-2 py-1.5 rounded border flex items-center justify-between gap-1 hover:bg-muted/50 transition-colors ${
-                                      hasUtm ? 'border-green-500 bg-green-50' : 'border-input bg-white'
+                                      isAutoCarry ? 'border-blue-500 bg-blue-50' : hasUtm ? 'border-green-500 bg-green-50' : 'border-input bg-white'
                                     }`}
                                   >
-                                    <span className={`truncate ${!hasUtm ? 'text-muted-foreground' : ''}`}>
-                                      {displayText}
+                                    <span className={`truncate ${!hasUtm ? 'text-muted-foreground' : ''} ${isExcluded ? 'line-through' : ''}`}>
+                                      {isExcluded ? '제외' : displayText}
                                     </span>
-                                    {hasUtm && (
+                                    {isAutoCarry ? (
+                                      <span title="이전 주 소재가 아직 운영 중이어서 자동 이월됨"><RefreshCw className="h-4 w-4 text-blue-600 shrink-0" /></span>
+                                    ) : hasUtm ? (
                                       <Check className="h-4 w-4 text-green-600 shrink-0" />
-                                    )}
+                                    ) : null}
                                   </button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-80" align="start">
@@ -444,6 +561,7 @@ export function Checklist() {
                                   </div>
                                 </PopoverContent>
                               </Popover>
+                              </div>
                             ) : (
                               <span className="text-muted-foreground text-center block">-</span>
                             )}
@@ -456,7 +574,8 @@ export function Checklist() {
               </table>
             </div>
           </CardContent>
-        </Card>
+          </Card>
+        )}
       </div>
     </>
   );

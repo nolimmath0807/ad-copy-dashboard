@@ -4,10 +4,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { productsApi, copyTypesApi, checklistsApi, copiesApi, teamsApi, teamProductsApi } from '@/lib/api-client';
+import { productsApi, copyTypesApi, teamsApi, dashboardApi } from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
 import { FileText, CheckCircle, BarChart3, Info, Users } from 'lucide-react';
-import type { Product, CopyType, GeneratedCopy, Team, Checklist as ChecklistType } from '@/types';
+import type { Product, CopyType, Team } from '@/types';
 
 // 현재 주차 계산
 function getCurrentWeek(): string {
@@ -18,15 +18,21 @@ function getCurrentWeek(): string {
   return `${now.getFullYear()}-W${weekNumber.toString().padStart(2, '0')}`;
 }
 
+interface DashboardSummary {
+  generation_matrix: { product_id: string; copy_type_id: string; count: number }[];
+  total_generations: number;
+  recent_copies: { id: string; created_at: string; products: { name: string }; copy_types: { code: string } }[];
+  checklist_stats: { total: number; filled: number; completion_rate: number };
+  team_checklist_stats: Record<string, { total: number; filled: number; completion_rate: number }>;
+}
+
 export function Dashboard() {
   const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
   const [copyTypes, setCopyTypes] = useState<CopyType[]>([]);
-  const [allCopies, setAllCopies] = useState<GeneratedCopy[]>([]);
-  const [allChecklists, setAllChecklists] = useState<ChecklistType[]>([]);
   const [teams, setTeams] = useState<Team[]>([]);
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [selectedTeamId, setSelectedTeamId] = useState<string | undefined>(undefined);
-  const [teamProductIds, setTeamProductIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   const isAdminOrLeader = user?.role === 'admin' || user?.role === 'leader';
@@ -35,18 +41,16 @@ export function Dashboard() {
   useEffect(() => {
     async function fetchData() {
       try {
-        const [productsData, copyTypesData, copiesData, checklistsData, teamsData] = await Promise.all([
+        const [productsData, copyTypesData, teamsData, summaryData] = await Promise.all([
           productsApi.list(),
           copyTypesApi.list(),
-          copiesApi.list(),
-          checklistsApi.list(undefined, currentWeek),
           teamsApi.list(),
+          dashboardApi.summary(currentWeek),
         ]);
         setProducts(productsData);
         setCopyTypes(copyTypesData);
-        setAllCopies(copiesData);
-        setAllChecklists(checklistsData);
         setTeams(teamsData);
+        setSummary(summaryData);
 
         // Set initial team for non-admin
         if (!isAdminOrLeader && user?.team_id) {
@@ -61,46 +65,29 @@ export function Dashboard() {
     fetchData();
   }, []);
 
-  // Fetch team products when selectedTeamId changes
-  useEffect(() => {
-    if (selectedTeamId) {
-      teamProductsApi.list(selectedTeamId).then((data) => {
-        setTeamProductIds(data.map((tp: any) => tp.product_id));
-      });
-    } else {
-      setTeamProductIds([]);
-    }
-  }, [selectedTeamId]);
-
   // 부모 유형만 필터링
   const parentCopyTypes = copyTypes.filter(ct => ct.parent_id === null);
 
-  // 이번 주 전체 체크리스트 완료율 (UTM 입력 기준)
-  const weekChecklists = allChecklists;
-  const weekFilledCount = weekChecklists.filter(c => c.utm_code && c.utm_code !== '[]').length;
-  const weekTotalCount = weekChecklists.length;
-  const weekCompletionRate = weekTotalCount > 0 ? Math.round((weekFilledCount / weekTotalCount) * 100) : 0;
+  // 이번 주 전체 체크리스트 완료율
+  const weekCompletionRate = summary?.checklist_stats.completion_rate ?? 0;
+  const weekFilledCount = summary?.checklist_stats.filled ?? 0;
+  const weekTotalCount = summary?.checklist_stats.total ?? 0;
 
   // 팀별 체크리스트 완수율
-  const teamWeekChecklists = selectedTeamId && teamProductIds.length > 0
-    ? weekChecklists.filter(c => teamProductIds.includes(c.product_id))
-    : [];
-  const teamFilledCount = teamWeekChecklists.filter(c => c.utm_code && c.utm_code !== '[]').length;
-  const teamTotalCount = teamWeekChecklists.length;
-  const teamCompletionRate = teamTotalCount > 0 ? Math.round((teamFilledCount / teamTotalCount) * 100) : 0;
+  const teamStats = selectedTeamId ? summary?.team_checklist_stats[selectedTeamId] : undefined;
+  const teamCompletionRate = teamStats?.completion_rate ?? 0;
+  const teamFilledCount = teamStats?.filled ?? 0;
+  const teamTotalCount = teamStats?.total ?? 0;
 
   // 상품 × 유형별 생성 횟수 계산
-  function getGenerationCount(productId: string, copyTypeId: string): number {
-    const childTypeIds = copyTypes
-      .filter(ct => ct.parent_id === copyTypeId)
-      .map(ct => ct.id);
-    const allTypeIds = [copyTypeId, ...childTypeIds];
-    return allCopies.filter(
-      copy => copy.product_id === productId && allTypeIds.includes(copy.copy_type_id)
-    ).length;
-  }
+  const getGenerationCount = (productId: string, copyTypeId: string): number => {
+    const item = summary?.generation_matrix.find(
+      m => m.product_id === productId && m.copy_type_id === copyTypeId
+    );
+    return item?.count || 0;
+  };
 
-  const totalGenerations = allCopies.length;
+  const totalGenerations = summary?.total_generations ?? 0;
 
   if (loading) {
     return (
@@ -281,11 +268,11 @@ export function Dashboard() {
             <CardTitle>최근 생성 원고</CardTitle>
           </CardHeader>
           <CardContent>
-            {allCopies.length === 0 ? (
+            {!summary?.recent_copies.length ? (
               <p className="text-muted-foreground">아직 생성된 원고가 없습니다.</p>
             ) : (
               <div className="space-y-2">
-                {allCopies.slice(0, 5).map((copy) => (
+                {summary.recent_copies.map((copy) => (
                   <div key={copy.id} className="flex items-center justify-between border-b pb-2">
                     <div>
                       <span className="font-medium">{copy.products?.name}</span>
