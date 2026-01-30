@@ -130,7 +130,7 @@ export function BestCopies() {
   const [sortKey, setSortKey] = useState<ColumnKey>('revenue');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
-  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     userPreferencesApi.get().then(data => {
