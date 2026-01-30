@@ -88,6 +88,7 @@ export interface Checklist {
   notes: string | null;
   week: string;
   utm_code: string | null;
+  excluded?: boolean;
   updated_at: string;
   products?: Product;
   product?: Product;
@@ -99,6 +100,7 @@ export interface ChecklistUpdate {
   status?: 'pending' | 'in_progress' | 'completed';
   notes?: string;
   utm_code?: string;
+  excluded?: boolean;
 }
 
 export interface ChecklistStats {
@@ -173,6 +175,7 @@ export interface TeamProduct {
   id: string;
   team_id: string;
   product_id: string;
+  active?: boolean;
   created_at: string;
 }
 
@@ -182,8 +185,18 @@ export interface AdPerformance {
   impressions: number;
   clicks: number;
   ctr: number;
-  revenue: number | null;
-  conversions: number | null;
+  cpc: number;
+  revenue: number;
+  conversions: number;
+  roas: number;
+}
+
+export interface UserPreferences {
+  user_id: string;
+  preferences: {
+    bestCopiesColumns?: string[];
+    [key: string]: unknown;
+  };
 }
 
 // Copy Type Performance

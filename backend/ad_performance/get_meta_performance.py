@@ -34,24 +34,39 @@ def get_performance_by_utm_codes(utm_codes: list[str], month: str) -> dict:
 
         placeholders = ','.join(['%s'] * len(utm_codes))
         sql = f"""
-            SELECT
-                regexp_replace(ad_code, '\\(.*\\)$', '') AS utm_code,
-                COALESCE(SUM(spend), 0) AS spend,
-                COALESCE(SUM(impressions), 0) AS impressions,
-                COALESCE(SUM(clicks), 0) AS clicks,
-                CASE
-                    WHEN COALESCE(SUM(impressions), 0) > 0
-                    THEN ROUND((COALESCE(SUM(clicks), 0)::numeric / SUM(impressions)) * 100, 2)
-                    ELSE 0
-                END AS ctr
-            FROM ad_performance.meta_daily_perform
-            WHERE regexp_replace(ad_code, '\\(.*\\)$', '') IN ({placeholders})
-              AND date >= %s
-              AND date < %s
-            GROUP BY regexp_replace(ad_code, '\\(.*\\)$', '')
+            WITH meta AS (
+                SELECT regexp_replace(ad_code, '^\\[[^]]*\\]', '') AS utm_code,
+                    COALESCE(SUM(spend), 0) AS spend,
+                    COALESCE(SUM(impressions), 0) AS impressions,
+                    COALESCE(SUM(clicks), 0) AS clicks,
+                    CASE WHEN COALESCE(SUM(impressions), 0) > 0
+                        THEN ROUND((COALESCE(SUM(clicks), 0)::numeric / SUM(impressions)) * 100, 2)
+                        ELSE 0 END AS ctr,
+                    CASE WHEN COALESCE(SUM(clicks), 0) > 0
+                        THEN ROUND(COALESCE(SUM(spend), 0)::numeric / SUM(clicks), 0)
+                        ELSE 0 END AS cpc
+                FROM ad_performance.meta_daily_perform
+                WHERE regexp_replace(ad_code, '^\\[[^]]*\\]', '') IN ({placeholders})
+                    AND date >= %s AND date < %s
+                GROUP BY 1
+            ),
+            cafe AS (
+                SELECT ad_code AS utm_code,
+                    COALESCE(SUM(revenue), 0) AS revenue,
+                    COALESCE(SUM(conversions), 0) AS conversions
+                FROM ad_performance.cafe24_daily_perform_2
+                WHERE ad_code IN ({placeholders})
+                    AND date >= %s AND date < %s
+                GROUP BY 1
+            )
+            SELECT m.utm_code, m.spend, m.impressions, m.clicks, m.ctr, m.cpc,
+                COALESCE(c.revenue, 0) AS revenue,
+                COALESCE(c.conversions, 0) AS conversions,
+                CASE WHEN m.spend > 0 THEN ROUND(COALESCE(c.revenue, 0)::numeric / m.spend * 100, 0) ELSE 0 END AS roas
+            FROM meta m LEFT JOIN cafe c ON m.utm_code = c.utm_code
         """
 
-        params = utm_codes + [start_date, end_date]
+        params = utm_codes + [start_date, end_date] + utm_codes + [start_date, end_date]
         cur.execute(sql, params)
 
         columns = [desc[0] for desc in cur.description]
@@ -66,8 +81,10 @@ def get_performance_by_utm_codes(utm_codes: list[str], month: str) -> dict:
                 'impressions': int(row_dict['impressions']),
                 'clicks': int(row_dict['clicks']),
                 'ctr': float(row_dict['ctr']),
-                'revenue': None,
-                'conversions': None,
+                'cpc': float(row_dict['cpc']),
+                'revenue': int(row_dict['revenue']),
+                'conversions': int(row_dict['conversions']),
+                'roas': int(row_dict['roas']),
             }
 
         return result
@@ -78,7 +95,7 @@ def get_performance_by_utm_codes(utm_codes: list[str], month: str) -> dict:
 def main(utm_codes: list[str], month: str):
     result = get_performance_by_utm_codes(utm_codes, month)
     for utm, data in result.items():
-        print(f"{utm}: spend={data['spend']}, impressions={data['impressions']}, clicks={data['clicks']}, ctr={data['ctr']}%")
+        print(f"{utm}: spend={data['spend']}, impressions={data['impressions']}, clicks={data['clicks']}, ctr={data['ctr']}%, cpc={data['cpc']}, revenue={data['revenue']}, conversions={data['conversions']}, roas={data['roas']}%")
     if not result:
         print("No matching data found.")
 

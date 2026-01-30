@@ -1,18 +1,52 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Header } from '@/components/layout/Header';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { adPerformanceApi, checklistsApi } from '@/lib/api-client';
-import type { AdPerformance, Checklist } from '@/types';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Trophy } from 'lucide-react';
+import { adPerformanceApi, checklistsApi, userPreferencesApi } from '@/lib/api-client';
+import type { AdPerformance, Checklist } from '@/types';
+import { Trophy, Settings2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+
+const ALL_COLUMNS = [
+  { key: 'product', label: '상품' },
+  { key: 'copy_type', label: '원고 유형' },
+  { key: 'utm_code', label: 'UTM코드' },
+  { key: 'impressions', label: '노출' },
+  { key: 'clicks', label: '클릭' },
+  { key: 'cpc', label: 'CPC' },
+  { key: 'ctr', label: 'CTR' },
+  { key: 'spend', label: '광고비' },
+  { key: 'conversions', label: '전환수' },
+  { key: 'revenue', label: '매출액' },
+  { key: 'roas', label: 'ROAS' },
+] as const;
+
+type ColumnKey = (typeof ALL_COLUMNS)[number]['key'];
+
+const DEFAULT_COLUMNS: ColumnKey[] = ALL_COLUMNS.map(c => c.key);
+
+
+interface TableRowData {
+  id: string;
+  product: string;
+  copy_type: string;
+  utm_code: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number;
+  cpc: number;
+  revenue: number;
+  conversions: number;
+  roas: number;
+}
+
+type SortDir = 'asc' | 'desc';
 
 function generateMonthOptions() {
   const options: string[] = [];
@@ -31,12 +65,29 @@ function formatMonth(month: string) {
   return `${year}년 ${parseInt(m)}월`;
 }
 
-function formatCurrency(amount: number) {
-  return new Intl.NumberFormat('ko-KR', {
-    style: 'currency',
-    currency: 'KRW',
-    maximumFractionDigits: 0,
-  }).format(amount);
+const currencyFmt = new Intl.NumberFormat('ko-KR', {
+  style: 'currency',
+  currency: 'KRW',
+  maximumFractionDigits: 0,
+});
+
+function formatCell(key: ColumnKey, value: string | number): string {
+  if (typeof value === 'string') return value;
+  switch (key) {
+    case 'spend':
+    case 'revenue':
+    case 'cpc':
+      return currencyFmt.format(value);
+    case 'ctr':
+    case 'roas':
+      return `${value}%`;
+    case 'impressions':
+    case 'clicks':
+    case 'conversions':
+      return value.toLocaleString();
+    default:
+      return String(value);
+  }
 }
 
 function parseUtmCodes(utmCode: string | null): string[] {
@@ -51,21 +102,67 @@ function parseUtmCodes(utmCode: string | null): string[] {
   return [];
 }
 
-interface UtmPerformanceRow {
-  utmCode: string;
-  checklist: Checklist;
-  perf: AdPerformance | null;
+function loadColumnPrefs(): ColumnKey[] {
+  // Sync fallback from localStorage while API loads
+  try {
+    const raw = localStorage.getItem('bestCopiesColumns');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return DEFAULT_COLUMNS;
+}
+
+function saveColumnPrefs(cols: ColumnKey[]) {
+  localStorage.setItem('bestCopiesColumns', JSON.stringify(cols));
+  userPreferencesApi.update({ bestCopiesColumns: cols }).catch(() => {});
 }
 
 export function BestCopies() {
-  const [rows, setRows] = useState<UtmPerformanceRow[]>([]);
+  const [rows, setRows] = useState<TableRowData[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string>(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   });
   const [loading, setLoading] = useState(true);
+  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(loadColumnPrefs);
+  const [sortKey, setSortKey] = useState<ColumnKey>('revenue');
+  const [sortDir, setSortDir] = useState<SortDir>('desc');
+
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    userPreferencesApi.get().then(data => {
+      const saved = data?.preferences?.bestCopiesColumns;
+      if (Array.isArray(saved) && saved.length > 0) {
+        setVisibleColumns(saved as ColumnKey[]);
+        localStorage.setItem('bestCopiesColumns', JSON.stringify(saved));
+      }
+    }).catch(() => {});
+  }, []);
 
   const monthOptions = generateMonthOptions();
+
+  const toggleColumn = useCallback((key: ColumnKey) => {
+    setVisibleColumns(prev => {
+      const next = prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key];
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => saveColumnPrefs(next), 500);
+      return next;
+    });
+  }, []);
+
+  const handleSort = useCallback((key: ColumnKey) => {
+    setSortKey(prev => {
+      if (prev === key) {
+        setSortDir(d => (d === 'asc' ? 'desc' : 'asc'));
+        return prev;
+      }
+      setSortDir('desc');
+      return key;
+    });
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -73,84 +170,119 @@ export function BestCopies() {
 
   async function fetchData() {
     setLoading(true);
-    try {
-      const checklists = await checklistsApi.listWithUtm();
+    const checklists = await checklistsApi.listWithUtm();
 
-      // 체크리스트에서 UTM 코드별 개별 행 생성
-      const utmRows: { utmCode: string; checklist: Checklist }[] = [];
-      for (const cl of checklists) {
-        const codes = parseUtmCodes(cl.utm_code);
-        for (const code of codes) {
-          utmRows.push({ utmCode: code, checklist: cl });
-        }
+    const utmRows: { utmCode: string; checklist: Checklist }[] = [];
+    for (const cl of checklists) {
+      const codes = parseUtmCodes(cl.utm_code);
+      for (const code of codes) {
+        utmRows.push({ utmCode: code, checklist: cl });
       }
-
-      const uniqueUtmCodes = [...new Set(utmRows.map(r => r.utmCode))];
-
-      let perfData: Record<string, AdPerformance> = {};
-      if (uniqueUtmCodes.length > 0) {
-        try {
-          perfData = await adPerformanceApi.getByUtmCodes(uniqueUtmCodes, selectedMonth);
-        } catch {
-          perfData = {};
-        }
-      }
-
-      // 각 UTM 코드에 성과 매핑
-      const result: UtmPerformanceRow[] = utmRows.map(row => ({
-        ...row,
-        perf: perfData[row.utmCode] || null,
-      }));
-
-      // 광고비 내림차순 (성과 있는 것 우선)
-      result.sort((a, b) => {
-        if (!!a.perf !== !!b.perf) return a.perf ? -1 : 1;
-        return (b.perf?.spend || 0) - (a.perf?.spend || 0);
-      });
-
-      setRows(result);
-    } catch (error) {
-      console.error('Failed to fetch data:', error);
-    } finally {
-      setLoading(false);
     }
+
+    const uniqueUtmCodes = [...new Set(utmRows.map(r => r.utmCode))];
+
+    let perfData: Record<string, AdPerformance> = {};
+    if (uniqueUtmCodes.length > 0) {
+      try {
+        perfData = await adPerformanceApi.getByUtmCodes(uniqueUtmCodes, selectedMonth);
+      } catch {
+        perfData = {};
+      }
+    }
+
+    const result: TableRowData[] = utmRows.map(row => {
+      const perf = perfData[row.utmCode];
+      return {
+        id: `${row.checklist.id}-${row.utmCode}`,
+        product: row.checklist.product?.name || (row.checklist as any).products?.name || '-',
+        copy_type: row.checklist.copy_type?.code || (row.checklist as any).copy_types?.code || '-',
+        utm_code: row.utmCode,
+        spend: perf?.spend ?? 0,
+        impressions: perf?.impressions ?? 0,
+        clicks: perf?.clicks ?? 0,
+        ctr: perf?.ctr ?? 0,
+        cpc: perf?.cpc ?? 0,
+        revenue: perf?.revenue ?? 0,
+        conversions: perf?.conversions ?? 0,
+        roas: perf?.roas ?? 0,
+      };
+    });
+
+    setRows(result);
+    setLoading(false);
   }
 
-  const rowsWithPerf = rows.filter(r => r.perf);
-  const totalSpend = rowsWithPerf.reduce((sum, r) => sum + (r.perf?.spend || 0), 0);
-  const totalImpressions = rowsWithPerf.reduce((sum, r) => sum + (r.perf?.impressions || 0), 0);
-  const totalClicks = rowsWithPerf.reduce((sum, r) => sum + (r.perf?.clicks || 0), 0);
-  const totalCtr = totalImpressions > 0
-    ? Math.round((totalClicks / totalImpressions) * 10000) / 100
-    : 0;
+  const sortedRows = [...rows].sort((a, b) => {
+    const av = a[sortKey];
+    const bv = b[sortKey];
+    if (typeof av === 'string' && typeof bv === 'string') {
+      return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+    }
+    return sortDir === 'asc' ? (av as number) - (bv as number) : (bv as number) - (av as number);
+  });
+
+  const totalSpend = rows.reduce((s, r) => s + r.spend, 0);
+  const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
+  const totalConversions = rows.reduce((s, r) => s + r.conversions, 0);
+  const avgRoas = totalSpend > 0 ? Math.round((totalRevenue / totalSpend) * 10000) / 100 : 0;
+
+  const SortIcon = ({ col }: { col: ColumnKey }) => {
+    if (sortKey !== col) return <ArrowUpDown className="ml-1 h-3 w-3 inline opacity-40" />;
+    return sortDir === 'asc'
+      ? <ArrowUp className="ml-1 h-3 w-3 inline" />
+      : <ArrowDown className="ml-1 h-3 w-3 inline" />;
+  };
 
   return (
     <>
       <Header title="등록소재 성과추적" />
       <div className="p-6 space-y-6">
-        {/* 월별 필터 */}
+        {/* Header row */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Trophy className="h-5 w-5 text-yellow-500" />
             <span className="font-medium">{formatMonth(selectedMonth)} 등록소재 성과</span>
           </div>
-          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-40">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {monthOptions.map(month => (
-                <SelectItem key={month} value={month}>
-                  {formatMonth(month)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="icon">
+                  <Settings2 className="h-4 w-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48" align="end">
+                <div className="space-y-2">
+                  <p className="text-sm font-medium mb-2">표시할 컬럼</p>
+                  {ALL_COLUMNS.map(col => (
+                    <label key={col.key} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        checked={visibleColumns.includes(col.key)}
+                        onCheckedChange={() => toggleColumn(col.key)}
+                      />
+                      {col.label}
+                    </label>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {monthOptions.map(month => (
+                  <SelectItem key={month} value={month}>
+                    {formatMonth(month)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {loading ? (
           <>
-            {/* Skeleton stat cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[...Array(4)].map((_, i) => (
                 <Card key={i}>
@@ -161,29 +293,11 @@ export function BestCopies() {
                 </Card>
               ))}
             </div>
-
-            {/* Skeleton UTM list */}
             <Card>
-              <CardHeader>
-                <Skeleton className="h-6 w-40" />
-              </CardHeader>
-              <CardContent>
+              <CardContent className="pt-6">
                 <div className="space-y-3">
                   {[...Array(6)].map((_, i) => (
-                    <div key={i} className="flex items-start gap-4 p-4 rounded-lg border bg-card">
-                      <Skeleton className="h-6 w-6 rounded-full" />
-                      <div className="flex-1 space-y-2">
-                        <div className="flex gap-2">
-                          <Skeleton className="h-5 w-16" />
-                          <Skeleton className="h-5 w-12" />
-                        </div>
-                        <Skeleton className="h-4 w-32" />
-                      </div>
-                      <div className="space-y-1 text-right">
-                        <Skeleton className="h-6 w-20 ml-auto" />
-                        <Skeleton className="h-3 w-12 ml-auto" />
-                      </div>
-                    </div>
+                    <Skeleton key={i} className="h-12 w-full" />
                   ))}
                 </div>
               </CardContent>
@@ -191,103 +305,97 @@ export function BestCopies() {
           </>
         ) : (
           <>
-            {/* 총 성과 요약 */}
+            {/* Summary cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card>
                 <CardContent className="pt-6">
                   <p className="text-sm text-muted-foreground">총 광고비</p>
-                  <p className="text-2xl font-bold">{formatCurrency(totalSpend)}</p>
+                  <p className="text-2xl font-bold">{currencyFmt.format(totalSpend)}</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-6">
-                  <p className="text-sm text-muted-foreground">총 노출수</p>
-                  <p className="text-2xl font-bold">{totalImpressions.toLocaleString()}</p>
+                  <p className="text-sm text-muted-foreground">총 매출액</p>
+                  <p className="text-2xl font-bold">{currencyFmt.format(totalRevenue)}</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-6">
-                  <p className="text-sm text-muted-foreground">총 클릭수</p>
-                  <p className="text-2xl font-bold">{totalClicks.toLocaleString()}</p>
+                  <p className="text-sm text-muted-foreground">평균 ROAS</p>
+                  <p className="text-2xl font-bold">{avgRoas}%</p>
                 </CardContent>
               </Card>
               <Card>
                 <CardContent className="pt-6">
-                  <p className="text-sm text-muted-foreground">평균 CTR</p>
-                  <p className="text-2xl font-bold">{totalCtr}%</p>
+                  <p className="text-sm text-muted-foreground">총 전환수</p>
+                  <p className="text-2xl font-bold">{totalConversions.toLocaleString()}</p>
                 </CardContent>
               </Card>
             </div>
 
-            {/* UTM 코드별 성과 목록 */}
+            {/* Data table */}
             <Card>
-              <CardHeader>
-                <CardTitle>UTM 코드별 성과</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {rows.length === 0 ? (
+              <CardContent className="pt-6">
+                {sortedRows.length === 0 ? (
                   <div className="py-8 text-center text-muted-foreground">
                     UTM 코드가 등록된 소재가 없습니다
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {rows.map((row, index) => (
-                      <div
-                        key={`${row.checklist.id}-${row.utmCode}`}
-                        className="flex items-start gap-4 p-4 rounded-lg border bg-card"
-                      >
-                        <div className="flex-shrink-0">
-                          <Badge
-                            variant={index < 3 && row.perf ? 'default' : 'secondary'}
-                            className={
-                              index === 0 && row.perf
-                                ? 'bg-yellow-500 hover:bg-yellow-600'
-                                : index === 1 && row.perf
-                                ? 'bg-gray-400 hover:bg-gray-500'
-                                : index === 2 && row.perf
-                                ? 'bg-amber-600 hover:bg-amber-700'
-                                : ''
-                            }
-                          >
-                            {index + 1}
-                          </Badge>
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            {(row.checklist.product || row.checklist.products) && (
-                              <Badge variant="outline">
-                                {(row.checklist.product || row.checklist.products)!.name}
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead className="w-12">#</TableHead>
+                          {ALL_COLUMNS.filter(c => visibleColumns.includes(c.key)).map(col => (
+                            <TableHead
+                              key={col.key}
+                              className="cursor-pointer select-none whitespace-nowrap"
+                              onClick={() => handleSort(col.key)}
+                            >
+                              {col.label}
+                              <SortIcon col={col.key} />
+                            </TableHead>
+                          ))}
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {sortedRows.map((row, index) => (
+                          <TableRow key={row.id}>
+                            <TableCell>
+                              <Badge
+                                variant={index < 3 ? 'default' : 'secondary'}
+                                className={
+                                  index === 0
+                                    ? 'bg-yellow-500 hover:bg-yellow-600'
+                                    : index === 1
+                                    ? 'bg-gray-400 hover:bg-gray-500'
+                                    : index === 2
+                                    ? 'bg-amber-600 hover:bg-amber-700'
+                                    : ''
+                                }
+                              >
+                                {index + 1}
                               </Badge>
-                            )}
-                            {(row.checklist.copy_type || row.checklist.copy_types) && (
-                              <Badge variant="secondary">
-                                {(row.checklist.copy_type || row.checklist.copy_types)!.code}
-                              </Badge>
-                            )}
-                          </div>
-                          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                            {row.utmCode}
-                          </span>
-                        </div>
-                        <div className="flex-shrink-0 text-right space-y-1">
-                          {row.perf ? (
-                            <>
-                              <p className="text-lg font-bold text-primary">
-                                {formatCurrency(row.perf.spend)}
-                              </p>
-                              <p className="text-xs text-muted-foreground">광고비</p>
-                              <div className="text-xs text-muted-foreground space-y-0.5 pt-1 border-t">
-                                <p>노출 {row.perf.impressions.toLocaleString()}</p>
-                                <p>클릭 {row.perf.clicks.toLocaleString()}</p>
-                                <p>CTR {row.perf.ctr}%</p>
-                              </div>
-                            </>
-                          ) : (
-                            <p className="text-sm text-muted-foreground">-</p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                            </TableCell>
+                            {ALL_COLUMNS.filter(c => visibleColumns.includes(c.key)).map(col => (
+                              <TableCell key={col.key} className="whitespace-nowrap">
+                                {col.key === 'product' ? (
+                                  <Badge variant="outline">{row.product}</Badge>
+                                ) : col.key === 'copy_type' ? (
+                                  <Badge variant="secondary">{row.copy_type}</Badge>
+                                ) : col.key === 'utm_code' ? (
+                                  <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded font-mono">
+                                    {row.utm_code}
+                                  </span>
+                                ) : (
+                                  formatCell(col.key, row[col.key])
+                                )}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 )}
               </CardContent>

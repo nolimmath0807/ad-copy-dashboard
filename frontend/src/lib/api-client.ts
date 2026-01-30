@@ -24,6 +24,7 @@ import type {
   CopyTypePerformance,
   WeeklyTeamPerformance,
   AuditLog,
+  UserPreferences,
 } from '@/types';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -112,6 +113,7 @@ export const teamsApi = {
 export const teamProductsApi = {
   list: (teamId?: string) => fetchAPI<TeamProduct[]>(`/api/team-products${teamId ? `?team_id=${teamId}` : ''}`),
   create: (teamId: string, productId: string) => fetchAPI<TeamProduct>('/api/team-products', { method: 'POST', body: JSON.stringify({ team_id: teamId, product_id: productId }) }),
+  update: (id: string, data: { active?: boolean }) => fetchAPI<TeamProduct>(`/api/team-products/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => fetchAPI<void>(`/api/team-products/${id}`, { method: 'DELETE' }),
 };
 
@@ -163,6 +165,11 @@ export const adPerformanceApi = {
     }),
 };
 
+// Dashboard API
+export const dashboardApi = {
+  summary: (week?: string) => fetchAPI<any>(`/api/dashboard/summary${week ? `?week=${week}` : ''}`),
+};
+
 // Audit Logs API
 export const auditLogsApi = {
   list: (tableName?: string, limit = 100, offset = 0) => {
@@ -172,4 +179,14 @@ export const auditLogsApi = {
     params.append('offset', String(offset));
     return fetchAPI<AuditLog[]>(`/api/audit-logs?${params}`);
   },
+};
+
+// User Preferences API
+export const userPreferencesApi = {
+  get: () => fetchAPI<UserPreferences>('/api/user-preferences'),
+  update: (preferences: Record<string, unknown>) =>
+    fetchAPI<UserPreferences>('/api/user-preferences', {
+      method: 'PUT',
+      body: JSON.stringify({ preferences }),
+    }),
 };

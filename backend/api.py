@@ -41,6 +41,7 @@ from checklists.get_stats import get_checklist_stats
 from checklists.update_checklist import update_checklist
 from checklists.init_week import init_week_checklists
 from checklists.list_with_utm import list_checklists_with_utm
+from checklists.check_alive_ads import check_alive_ads
 
 # Best Copies
 from best_copies.list_best import list_best_copies
@@ -49,6 +50,9 @@ from best_copies.create_best import create_best_copy
 # AI
 from ai.generate_copy import generate_ad_copy
 from ai.regenerate_copy import regenerate_copy
+
+# Dashboard
+from dashboard.get_summary import get_dashboard_summary
 
 # Ad Performance
 from ad_performance.get_meta_performance import get_performance_by_utm_codes
@@ -64,6 +68,11 @@ from teams.delete_team import delete_team
 from team_products.list_team_products import list_team_products
 from team_products.create_team_product import create_team_product
 from team_products.delete_team_product import delete_team_product
+from team_products.update_team_product import update_team_product
+
+# User Preferences
+from user_preferences.get_preferences import get_preferences
+from user_preferences.update_preferences import update_preferences
 
 # Auth
 from auth.register import register_user
@@ -167,6 +176,7 @@ class ChecklistUpdate(BaseModel):
     status: Optional[str] = None
     notes: Optional[str] = None
     utm_code: Optional[str] = None
+    excluded: Optional[bool] = None
 
 
 # Best Copy Models
@@ -194,6 +204,10 @@ class TeamProductCreate(BaseModel):
     product_id: str
 
 
+class TeamProductUpdate(BaseModel):
+    active: Optional[bool] = None
+
+
 # Auth Models
 class AuthRegister(BaseModel):
     email: str
@@ -217,6 +231,10 @@ class UserNameUpdate(BaseModel):
 
 class PasswordReset(BaseModel):
     password: str
+
+
+class UserPreferencesUpdate(BaseModel):
+    preferences: dict
 
 
 class AdPerformanceRequest(BaseModel):
@@ -384,6 +402,15 @@ def api_get_checklist_stats(team_id: str = None):
     return get_checklist_stats(team_id)
 
 
+@app.get("/api/checklists/check-alive")
+def api_check_alive_ads(utm_codes: str):
+    """UTM 코드들의 광고 생존 여부 확인"""
+    codes = [c.strip() for c in utm_codes.split(",") if c.strip()]
+    if not codes:
+        return {}
+    return check_alive_ads(codes)
+
+
 @app.put("/api/checklists/{id}")
 def api_update_checklist(id: str, data: ChecklistUpdate, authorization: str = Header(None)):
     checklist_data = data.model_dump(exclude_none=True)
@@ -453,6 +480,14 @@ def api_create_team_product(data: TeamProductCreate, authorization: str = Header
         init_week_checklists()
     except Exception as e:
         print(f"[auto-init] Failed to init checklists after team_product create: {e}")
+    return result
+
+
+@app.put("/api/team-products/{id}")
+def api_update_team_product(id: str, data: TeamProductUpdate, authorization: str = Header(None)):
+    update_data = data.model_dump(exclude_none=True)
+    result = update_team_product(int(id), update_data)
+    write_audit_log(get_user_id_from_request(authorization), "update", "team_products", id, update_data)
     return result
 
 
@@ -550,12 +585,41 @@ def api_get_weekly_performance(data: WeeklyPerformanceRequest):
 
 
 # ============================================
+# Dashboard API
+# ============================================
+
+@app.get("/api/dashboard/summary")
+def api_dashboard_summary(week: Optional[str] = None):
+    return get_dashboard_summary(week)
+
+
+# ============================================
 # Audit Logs API
 # ============================================
 
 @app.get("/api/audit-logs")
 def api_list_audit_logs(table_name: Optional[str] = None, user_id: Optional[str] = None, limit: int = 100, offset: int = 0):
     return list_audit_logs(table_name, user_id, limit, offset)
+
+
+# ============================================
+# User Preferences API
+# ============================================
+
+@app.get("/api/user-preferences")
+def api_get_user_preferences(authorization: str = Header(None)):
+    user_id = get_user_id_from_request(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return get_preferences(user_id)
+
+
+@app.put("/api/user-preferences")
+def api_update_user_preferences(data: UserPreferencesUpdate, authorization: str = Header(None)):
+    user_id = get_user_id_from_request(authorization)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    return update_preferences(user_id, data.preferences)
 
 
 # ============================================
