@@ -6,7 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2, Package } from 'lucide-react';
+import { Plus, Trash2, Package, Building2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { EmptyState } from '@/components/ui/empty-state';
 
 export default function AdminTeams() {
   const [teams, setTeams] = useState<Team[]>([]);
@@ -43,30 +45,45 @@ export default function AdminTeams() {
   };
 
   const handleProductToggle = async (teamId: string, productId: string, checked: boolean) => {
-    if (checked) {
-      const newTeamProduct = await teamProductsApi.create(teamId, productId);
-      setTeamProducts(prev => [...prev, newTeamProduct]);
-    } else {
-      const entry = getTeamProductEntry(teamId, productId);
-      if (entry) {
-        await teamProductsApi.delete(entry.id);
-        setTeamProducts(prev => prev.filter(tp => tp.id !== entry.id));
+    try {
+      if (checked) {
+        const newTeamProduct = await teamProductsApi.create(teamId, productId);
+        setTeamProducts(prev => [...prev, newTeamProduct]);
+      } else {
+        const entry = getTeamProductEntry(teamId, productId);
+        if (entry) {
+          await teamProductsApi.delete(entry.id);
+          setTeamProducts(prev => prev.filter(tp => tp.id !== entry.id));
+        }
       }
+      toast.success("담당상품이 변경되었습니다");
+    } catch {
+      toast.error("오류가 발생했습니다");
     }
   };
 
   const handleAddTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTeamName.trim()) return;
-    await teamsApi.create({ name: newTeamName });
-    setNewTeamName('');
-    loadData();
+    try {
+      await teamsApi.create({ name: newTeamName });
+      setNewTeamName('');
+      toast.success("팀이 생성되었습니다");
+      loadData();
+    } catch {
+      toast.error("오류가 발생했습니다");
+    }
   };
 
   const handleDeleteTeam = async (teamId: string) => {
     if (!confirm('정말 이 팀을 삭제하시겠습니까?')) return;
-    await teamsApi.delete(teamId);
-    loadData();
+    try {
+      await teamsApi.delete(teamId);
+      toast.success("팀이 삭제되었습니다");
+      loadData();
+    } catch {
+      toast.error("오류가 발생했습니다");
+    }
   };
 
   return (
@@ -94,6 +111,12 @@ export default function AdminTeams() {
             <div className="flex justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
             </div>
+          ) : teams.length === 0 ? (
+            <EmptyState
+              icon={Building2}
+              title="등록된 팀이 없습니다"
+              description="새 팀을 추가하여 시작하세요"
+            />
           ) : (
             <Table>
               <TableHeader>

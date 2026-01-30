@@ -4,10 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Skeleton } from '@/components/ui/skeleton';
+import { EmptyState } from '@/components/ui/empty-state';
 import { productsApi, copyTypesApi, teamsApi, dashboardApi } from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
-import { FileText, CheckCircle, BarChart3, Info, Users } from 'lucide-react';
+import { FileText, CheckCircle, BarChart3, Info, Users, LayoutDashboard } from 'lucide-react';
 import type { Product, CopyType, Team } from '@/types';
+
+const SERVICE_START_WEEK = '2026-W05';
 
 // 현재 주차 계산
 function getCurrentWeek(): string {
@@ -16,6 +20,41 @@ function getCurrentWeek(): string {
   const days = Math.floor((now.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
   const weekNumber = Math.ceil((days + startOfYear.getDay() + 1) / 7);
   return `${now.getFullYear()}-W${weekNumber.toString().padStart(2, '0')}`;
+}
+
+function getWeekDateRange(week: string): string {
+  const [year, w] = week.split('-W');
+  const weekNum = parseInt(w);
+  const jan4 = new Date(parseInt(year), 0, 4);
+  const dayOfWeek = jan4.getDay() || 7;
+  const firstMonday = new Date(jan4);
+  firstMonday.setDate(jan4.getDate() - dayOfWeek + 1);
+  const weekStart = new Date(firstMonday);
+  weekStart.setDate(firstMonday.getDate() + (weekNum - 1) * 7);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  return `${weekStart.getMonth() + 1}/${weekStart.getDate()}~${weekEnd.getMonth() + 1}/${weekEnd.getDate()}`;
+}
+
+function generateWeekOptions() {
+  const options: { value: string; label: string }[] = [];
+  const currentWeek = getCurrentWeek();
+  const [currentYear, currentW] = currentWeek.split('-W');
+  let year = parseInt(currentYear);
+  let weekNum = parseInt(currentW);
+
+  for (let i = 0; i < 8; i++) {
+    const value = `${year}-W${weekNum.toString().padStart(2, '0')}`;
+    if (value < SERVICE_START_WEEK) break;
+    const label = getWeekDateRange(value);
+    options.push({ value, label });
+    weekNum--;
+    if (weekNum === 0) {
+      year--;
+      weekNum = 52;
+    }
+  }
+  return options;
 }
 
 interface DashboardSummary {
@@ -35,17 +74,21 @@ export function Dashboard() {
   const [selectedTeamId, setSelectedTeamId] = useState<string | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
+  const weekOptions = generateWeekOptions();
+  const [selectedWeek, setSelectedWeek] = useState(weekOptions[0]?.value ?? '');
+
   const isAdminOrLeader = user?.role === 'admin' || user?.role === 'leader';
   const currentWeek = getCurrentWeek();
 
   useEffect(() => {
     async function fetchData() {
+      setLoading(true);
       try {
         const [productsData, copyTypesData, teamsData, summaryData] = await Promise.all([
           productsApi.list(),
           copyTypesApi.list(),
           teamsApi.list(),
-          dashboardApi.summary(currentWeek),
+          dashboardApi.summary(selectedWeek || currentWeek),
         ]);
         setProducts(productsData);
         setCopyTypes(copyTypesData);
@@ -63,7 +106,7 @@ export function Dashboard() {
       }
     }
     fetchData();
-  }, []);
+  }, [selectedWeek]);
 
   // 부모 유형만 필터링
   const parentCopyTypes = copyTypes.filter(ct => ct.parent_id === null);
@@ -93,7 +136,24 @@ export function Dashboard() {
     return (
       <>
         <Header title="대시보드" />
-        <div className="p-6">로딩 중...</div>
+        <div className="p-6 space-y-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <Card key={i}>
+                <CardContent className="pt-6">
+                  <Skeleton className="h-4 w-20 mb-2" />
+                  <Skeleton className="h-8 w-28" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <Card>
+            <CardContent className="pt-6">
+              <Skeleton className="h-6 w-48 mb-4" />
+              <Skeleton className="h-64 w-full" />
+            </CardContent>
+          </Card>
+        </div>
       </>
     );
   }
@@ -102,6 +162,21 @@ export function Dashboard() {
     <>
       <Header title="대시보드" />
       <div className="p-6 space-y-6">
+        {/* 주간 선택 */}
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-muted-foreground">주간 선택</span>
+          <Select value={selectedWeek} onValueChange={setSelectedWeek}>
+            <SelectTrigger className="w-48">
+              <SelectValue placeholder="주간 선택" />
+            </SelectTrigger>
+            <SelectContent>
+              {weekOptions.map(option => (
+                <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* 통계 카드 */}
         <div className="grid grid-cols-4 gap-4">
           {/* 팀별 완수율 카드 */}
@@ -194,6 +269,13 @@ export function Dashboard() {
             <p className="text-sm text-muted-foreground">각 셀은 해당 상품 x 유형 조합의 원고 생성 횟수입니다</p>
           </CardHeader>
           <CardContent>
+            {summary?.generation_matrix.length === 0 ? (
+              <EmptyState
+                icon={LayoutDashboard}
+                title="데이터가 없습니다"
+                description="선택한 주간에 생성된 원고가 없습니다"
+              />
+            ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
@@ -259,6 +341,7 @@ export function Dashboard() {
                 </tbody>
               </table>
             </div>
+            )}
           </CardContent>
         </Card>
 

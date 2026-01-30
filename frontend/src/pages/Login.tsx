@@ -39,8 +39,8 @@ export default function Login() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md">
-                {error}
+              <div className="rounded-md bg-destructive/10 border border-destructive/20 p-3">
+                <p className="text-sm text-destructive">{error}</p>
               </div>
             )}
             <div className="space-y-2">
@@ -65,6 +65,9 @@ export default function Login() {
                 required
               />
             </div>
+            <p className="text-xs text-muted-foreground text-right">
+              비밀번호를 잊으셨나요? 관리자에게 문의하세요
+            </p>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? '로그인 중...' : '로그인'}
             </Button>

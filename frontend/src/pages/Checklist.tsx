@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -178,8 +179,10 @@ export function Checklist() {
           await checklistsApi.initWeek(selectedWeek);
           const refreshedData = await checklistsApi.list(selectedTeamId, selectedWeek);
           filteredChecklists = refreshedData;
+          toast.success('주간 체크리스트가 초기화되었습니다');
         } catch (err) {
           console.error('[Checklist] Failed to auto-init week:', err);
+          toast.error('오류가 발생했습니다');
         }
       }
 
@@ -208,6 +211,7 @@ export function Checklist() {
       }
     } catch (error) {
       console.error('Failed to fetch data:', error);
+      toast.error('오류가 발생했습니다');
     } finally {
       setLoading(false);
     }
@@ -219,8 +223,10 @@ export function Checklist() {
       setChecklists(prev => prev.map(c =>
         checklistIds.includes(c.id) ? { ...c, excluded: exclude } : c
       ));
+      toast(exclude ? '체크리스트가 제외되었습니다' : '제외가 해제되었습니다');
     } catch (error) {
       console.error('Failed to bulk toggle excluded:', error);
+      toast.error('오류가 발생했습니다');
     }
   }
 
@@ -230,8 +236,10 @@ export function Checklist() {
       setChecklists(prev => prev.map(c =>
         c.id === checklistId ? { ...c, excluded: !currentExcluded } : c
       ));
+      toast(!currentExcluded ? '체크리스트가 제외되었습니다' : '제외가 해제되었습니다');
     } catch (error) {
       console.error('Failed to toggle excluded:', error);
+      toast.error('오류가 발생했습니다');
     }
   }
 
@@ -269,8 +277,10 @@ export function Checklist() {
           ? { ...c, utm_code: utmCodeString, status }
           : c
       ));
+      toast.success('UTM 코드가 저장되었습니다');
     } catch (error) {
       console.error('Failed to update UTM codes:', error);
+      toast.error('오류가 발생했습니다');
     }
   }
 

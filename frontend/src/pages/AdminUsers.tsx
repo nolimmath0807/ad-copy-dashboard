@@ -7,13 +7,18 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
 import { Check, Pencil, KeyRound } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingNameId, setEditingNameId] = useState<string | null>(null);
   const [editingNameValue, setEditingNameValue] = useState('');
+  const [resetDialog, setResetDialog] = useState<{ open: boolean; userId: string; userName: string }>({ open: false, userId: '', userName: '' });
+  const [newPassword, setNewPassword] = useState('');
 
   const loadUsers = async () => {
     const data = await authApi.listUsers();
@@ -26,26 +31,45 @@ export default function AdminUsers() {
   }, []);
 
   const handleRoleChange = async (userId: string, role: string) => {
-    await authApi.updateRole(userId, role);
-    loadUsers();
+    try {
+      await authApi.updateRole(userId, role);
+      toast.success('역할이 변경되었습니다');
+      loadUsers();
+    } catch {
+      toast.error('오류가 발생했습니다');
+    }
   };
 
   const handleApprove = async (userId: string) => {
-    await authApi.approve(userId);
-    loadUsers();
+    try {
+      await authApi.approve(userId);
+      toast.success('사용자가 승인되었습니다');
+      loadUsers();
+    } catch {
+      toast.error('오류가 발생했습니다');
+    }
   };
 
   const handleNameUpdate = async (userId: string, name: string) => {
-    await authApi.updateName(userId, name);
-    setEditingNameId(null);
-    loadUsers();
+    try {
+      await authApi.updateName(userId, name);
+      toast.success('이름이 변경되었습니다');
+      setEditingNameId(null);
+      loadUsers();
+    } catch {
+      toast.error('오류가 발생했습니다');
+    }
   };
 
-  const handlePasswordReset = async (userId: string) => {
-    const newPassword = window.prompt('새 비밀번호를 입력하세요');
-    if (!newPassword) return;
-    await authApi.resetPassword(userId, newPassword);
-    alert('비밀번호가 재설정되었습니다.');
+  const handlePasswordReset = async () => {
+    try {
+      await authApi.resetPassword(resetDialog.userId, newPassword);
+      toast.success('비밀번호가 변경되었습니다');
+      setResetDialog(prev => ({ ...prev, open: false }));
+      setNewPassword('');
+    } catch {
+      toast.error('오류가 발생했습니다');
+    }
   };
 
   return (
@@ -136,7 +160,7 @@ export default function AdminUsers() {
                             승인
                           </Button>
                         )}
-                        <Button size="sm" variant="outline" onClick={() => handlePasswordReset(user.id)}>
+                        <Button size="sm" variant="outline" onClick={() => setResetDialog({ open: true, userId: user.id, userName: user.name })}>
                           <KeyRound className="w-4 h-4 mr-1" />
                           PW 재설정
                         </Button>
@@ -149,6 +173,22 @@ export default function AdminUsers() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={resetDialog.open} onOpenChange={(open) => { setResetDialog(prev => ({ ...prev, open })); setNewPassword(''); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{resetDialog.userName} 비밀번호 재설정</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label>새 비밀번호</Label>
+            <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="새 비밀번호 입력" />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setResetDialog(prev => ({ ...prev, open: false }))}>취소</Button>
+            <Button onClick={handlePasswordReset} disabled={!newPassword}>변경</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

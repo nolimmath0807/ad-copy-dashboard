@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { adPerformanceApi, checklistsApi, userPreferencesApi } from '@/lib/api-client';
 import type { AdPerformance, Checklist } from '@/types';
-import { Trophy, Settings2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Trophy, Settings2, ArrowUpDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 const ALL_COLUMNS = [
   { key: 'product', label: '상품' },
@@ -227,6 +228,21 @@ export function BestCopies() {
   const totalConversions = rows.reduce((s, r) => s + r.conversions, 0);
   const avgRoas = totalSpend > 0 ? Math.round((totalRevenue / totalSpend) * 10000) / 100 : 0;
 
+  function handleExport() {
+    const visibleCols = ALL_COLUMNS.filter(c => visibleColumns.includes(c.key));
+    const headers = visibleCols.map(c => c.label);
+    const data = sortedRows.map(row =>
+      visibleCols.map(col => {
+        const val = row[col.key];
+        return val;
+      })
+    );
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '등록소재성과');
+    XLSX.writeFile(wb, `등록소재성과_${selectedMonth}.xlsx`);
+  }
+
   const SortIcon = ({ col }: { col: ColumnKey }) => {
     if (sortKey !== col) return <ArrowUpDown className="ml-1 h-3 w-3 inline opacity-40" />;
     return sortDir === 'asc'
@@ -266,6 +282,9 @@ export function BestCopies() {
                 </div>
               </PopoverContent>
             </Popover>
+            <Button variant="outline" size="icon" onClick={handleExport}>
+              <Download className="h-4 w-4" />
+            </Button>
             <Select value={selectedMonth} onValueChange={setSelectedMonth}>
               <SelectTrigger className="w-40">
                 <SelectValue />

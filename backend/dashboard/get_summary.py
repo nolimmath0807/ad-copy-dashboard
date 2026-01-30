@@ -1,4 +1,5 @@
 import argparse
+import json
 from collections import defaultdict
 from conn import get_supabase_client
 
@@ -64,17 +65,29 @@ def get_dashboard_summary(week: str = None):
     ]
 
     # 5. Checklist stats
-    checklist_query = client.table("checklists").select("id, utm_code, product_id")
+    checklist_query = client.table("checklists").select("id, utm_code, product_id, excluded, team_id")
     if week:
         checklist_query = checklist_query.eq("week", week)
     checklists_resp = checklist_query.execute()
     checklists = checklists_resp.data
 
-    total = len(checklists)
-    filled = sum(
-        1 for cl in checklists
-        if cl.get("utm_code") and cl["utm_code"] not in (None, "", "[]", [])
-    )
+    def is_utm_filled(utm_code):
+        """Match frontend parseUtmCodes logic: parse JSON array, check length > 0"""
+        if not utm_code:
+            return False
+        try:
+            parsed = json.loads(utm_code)
+            if isinstance(parsed, list):
+                return len(parsed) > 0
+            return True  # non-array string
+        except (json.JSONDecodeError, TypeError):
+            return bool(utm_code.strip())
+
+    # Filter out excluded items (matching Checklist page behavior)
+    active_checklists = [cl for cl in checklists if not cl.get("excluded", False)]
+
+    total = len(active_checklists)
+    filled = sum(1 for cl in active_checklists if is_utm_filled(cl.get("utm_code")))
     completion_rate = round(filled * 100 / total) if total > 0 else 0
 
     checklist_stats = {
@@ -83,20 +96,14 @@ def get_dashboard_summary(week: str = None):
         "completion_rate": completion_rate,
     }
 
-    # 6. Team checklist stats
-    # Get team_products mapping: product_id -> team_id
-    tp_resp = client.table("team_products").select("team_id, product_id").execute()
-    product_to_team = {}
-    for tp in tp_resp.data:
-        product_to_team[tp["product_id"]] = tp["team_id"]
-
+    # 6. Team checklist stats — use team_id directly from checklists
     team_stats = defaultdict(lambda: {"total": 0, "filled": 0})
-    for cl in checklists:
-        team_id = product_to_team.get(cl.get("product_id"))
+    for cl in active_checklists:
+        team_id = cl.get("team_id")
         if not team_id:
             continue
         team_stats[team_id]["total"] += 1
-        if cl.get("utm_code") and cl["utm_code"] not in (None, "", "[]", []):
+        if is_utm_filled(cl.get("utm_code")):
             team_stats[team_id]["filled"] += 1
 
     team_checklist_stats = {}

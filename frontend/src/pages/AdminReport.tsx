@@ -124,10 +124,18 @@ export default function AdminReport() {
 
     for (const week of selectedWeeks) {
       const weekChecklists = checklists.filter(
-        c => c.week === week && teamProductIds.includes(c.product_id)
+        c => c.week === week && teamProductIds.includes(c.product_id) && !c.excluded
       );
       const total = weekChecklists.length;
-      const filled = weekChecklists.filter(c => c.utm_code && c.utm_code.trim() !== '').length;
+      const filled = weekChecklists.filter(c => {
+        if (!c.utm_code) return false;
+        try {
+          const parsed = JSON.parse(c.utm_code);
+          return Array.isArray(parsed) ? parsed.length > 0 : true;
+        } catch {
+          return c.utm_code.trim() !== '';
+        }
+      }).length;
       completionData[team.id][week] = total > 0 ? Math.round((filled / total) * 100) : 0;
     }
   }

@@ -2,6 +2,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import {
   LayoutDashboard,
   Package,
@@ -37,12 +38,16 @@ const adminMenuItems = [
   { icon: ScrollText, label: '감사 로그', path: '/admin/audit' },
 ];
 
-export function Sidebar() {
+function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   const location = useLocation();
   const { user, logout } = useAuth();
 
+  function handleClick() {
+    onNavigate?.();
+  }
+
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 border-r bg-card flex flex-col">
+    <div className="flex h-full flex-col">
       <div className="flex h-14 items-center border-b px-6">
         <h1 className="text-lg font-semibold">Ad Copy Dashboard</h1>
       </div>
@@ -54,6 +59,7 @@ export function Sidebar() {
             <Link
               key={item.path}
               to={item.path}
+              onClick={handleClick}
               className={cn(
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                 isActive
@@ -79,6 +85,7 @@ export function Sidebar() {
                 <Link
                   key={item.path}
                   to={item.path}
+                  onClick={handleClick}
                   className={cn(
                     "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                     isActive
@@ -97,6 +104,7 @@ export function Sidebar() {
                 <Link
                   key={item.path}
                   to={item.path}
+                  onClick={handleClick}
                   className={cn(
                     "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                     isActive
@@ -127,6 +135,29 @@ export function Sidebar() {
           로그아웃
         </Button>
       </div>
+    </div>
+  );
+}
+
+export function Sidebar() {
+  return (
+    <aside className="fixed left-0 top-0 h-screen w-64 border-r bg-card hidden lg:flex flex-col">
+      <SidebarContent />
     </aside>
+  );
+}
+
+interface MobileSidebarProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function MobileSidebar({ open, onOpenChange }: MobileSidebarProps) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent side="left" className="w-64 p-0">
+        <SidebarContent onNavigate={() => onOpenChange(false)} />
+      </SheetContent>
+    </Sheet>
   );
 }

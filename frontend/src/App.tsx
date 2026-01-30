@@ -9,6 +9,7 @@ import { CopyGenerator } from '@/pages/CopyGenerator';
 import { Checklist } from '@/pages/Checklist';
 import { BestCopies } from '@/pages/BestCopies';
 import Analytics from '@/pages/Analytics';
+import { Toaster } from '@/components/ui/sonner';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
 import Pending from '@/pages/Pending';
@@ -87,6 +88,7 @@ export default function App() {
             </ProtectedRoute>
           } />
         </Routes>
+        <Toaster position="top-right" richColors />
       </AuthProvider>
     </BrowserRouter>
   );

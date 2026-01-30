@@ -6,6 +6,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollText } from 'lucide-react';
 
 const TABLE_OPTIONS = [
@@ -36,6 +38,10 @@ export default function AuditLogs() {
   const [tableFilter, setTableFilter] = useState('all');
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [detailLog, setDetailLog] = useState<AuditLog | null>(null);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [userFilter, setUserFilter] = useState('');
   const PAGE_SIZE = 50;
 
   const fetchLogs = async (offset = 0, append = false) => {
@@ -56,6 +62,13 @@ export default function AuditLogs() {
     fetchLogs(0, false);
   }, [tableFilter]);
 
+  const filteredLogs = logs.filter(log => {
+    if (startDate && log.created_at < startDate) return false;
+    if (endDate && log.created_at > endDate + 'T23:59:59') return false;
+    if (userFilter && !(log.user_name || '').toLowerCase().includes(userFilter.toLowerCase())) return false;
+    return true;
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -75,6 +88,13 @@ export default function AuditLogs() {
         </Select>
       </div>
 
+      <div className="flex gap-2 flex-wrap">
+        <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} className="w-40" />
+        <span className="self-center text-muted-foreground">~</span>
+        <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} className="w-40" />
+        <Input placeholder="사용자 이름" value={userFilter} onChange={e => setUserFilter(e.target.value)} className="w-40" />
+      </div>
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">변경 이력</CardTitle>
@@ -92,7 +112,7 @@ export default function AuditLogs() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {logs.map(log => (
+              {filteredLogs.map(log => (
                 <TableRow key={log.id}>
                   <TableCell className="text-xs text-muted-foreground">{formatDate(log.created_at)}</TableCell>
                   <TableCell className="text-sm">{log.user_name || '-'}</TableCell>
@@ -103,12 +123,15 @@ export default function AuditLogs() {
                   </TableCell>
                   <TableCell className="text-sm font-mono">{log.table_name}</TableCell>
                   <TableCell className="text-xs font-mono truncate max-w-28">{log.record_id ? log.record_id.slice(0, 8) + '...' : '-'}</TableCell>
-                  <TableCell className="text-xs font-mono max-w-xs truncate">
+                  <TableCell
+                    className="text-xs font-mono max-w-xs truncate cursor-pointer hover:underline"
+                    onClick={() => setDetailLog(log)}
+                  >
                     {log.changes ? JSON.stringify(log.changes).slice(0, 100) : '-'}
                   </TableCell>
                 </TableRow>
               ))}
-              {logs.length === 0 && !loading && (
+              {filteredLogs.length === 0 && !loading && (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     감사 로그가 없습니다
@@ -126,6 +149,26 @@ export default function AuditLogs() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!detailLog} onOpenChange={(open) => !open && setDetailLog(null)}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>변경 내용 상세</DialogTitle>
+          </DialogHeader>
+          {detailLog && (
+            <div className="space-y-2 text-sm">
+              <p><span className="font-medium">시간:</span> {new Date(detailLog.created_at).toLocaleString('ko-KR')}</p>
+              <p><span className="font-medium">사용자:</span> {detailLog.user_name || '-'}</p>
+              <p><span className="font-medium">액션:</span> {detailLog.action}</p>
+              <p><span className="font-medium">테이블:</span> {detailLog.table_name}</p>
+              <p><span className="font-medium">레코드 ID:</span> {detailLog.record_id || '-'}</p>
+              <pre className="bg-muted p-3 rounded-md overflow-auto max-h-64 text-xs">
+                {JSON.stringify(detailLog.changes, null, 2)}
+              </pre>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

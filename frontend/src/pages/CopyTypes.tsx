@@ -22,7 +22,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { copyTypesApi } from '@/lib/api-client';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Plus, Pencil, Trash2, FileText } from 'lucide-react';
 import type { CopyType, CopyTypeCreate } from '@/types';
 
 const initialFormData: CopyTypeCreate = {
@@ -72,19 +74,30 @@ export function CopyTypes() {
   }
 
   async function handleSubmit() {
-    if (editingId) {
-      await copyTypesApi.update(editingId, formData);
-    } else {
-      await copyTypesApi.create(formData);
+    try {
+      if (editingId) {
+        await copyTypesApi.update(editingId, formData);
+        toast.success('원고유형이 수정되었습니다');
+      } else {
+        await copyTypesApi.create(formData);
+        toast.success('원고유형이 추가되었습니다');
+      }
+      setDialogOpen(false);
+      fetchCopyTypes();
+    } catch {
+      toast.error('오류가 발생했습니다');
     }
-    setDialogOpen(false);
-    fetchCopyTypes();
   }
 
   async function handleDelete(id: string) {
     if (confirm('정말 삭제하시겠습니까?')) {
-      await copyTypesApi.delete(id);
-      fetchCopyTypes();
+      try {
+        await copyTypesApi.delete(id);
+        toast.success('원고유형이 삭제되었습니다');
+        fetchCopyTypes();
+      } catch {
+        toast.error('오류가 발생했습니다');
+      }
     }
   }
 
@@ -191,9 +204,12 @@ export function CopyTypes() {
         {loading ? (
           <div className="text-center py-8 text-muted-foreground">로딩 중...</div>
         ) : copyTypes.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
-            등록된 원고 유형이 없습니다. 새 유형을 추가해주세요.
-          </div>
+          <EmptyState
+            icon={FileText}
+            title="등록된 원고유형이 없습니다"
+            description="새 원고유형을 추가하여 시작하세요"
+            action={<Button onClick={handleOpenCreate}>새 원고유형 추가</Button>}
+          />
         ) : (
           <Table>
             <TableHeader>

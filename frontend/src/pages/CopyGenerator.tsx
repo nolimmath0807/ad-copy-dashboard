@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/select';
 import { productsApi, copyTypesApi, aiApi } from '@/lib/api-client';
 import { Wand2, Copy, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import type { Product, CopyType, GeneratedCopy } from '@/types';
 
 export function CopyGenerator() {
@@ -56,7 +57,7 @@ export function CopyGenerator() {
       setGeneratedCopy(result);
     } catch (error) {
       console.error('Failed to generate copy:', error);
-      alert('원고 생성에 실패했습니다. Gemini API 키를 확인해주세요.');
+      toast.error('원고 생성에 실패했습니다');
     } finally {
       setLoading(false);
     }
@@ -65,7 +66,7 @@ export function CopyGenerator() {
   function handleCopyToClipboard() {
     if (generatedCopy) {
       navigator.clipboard.writeText(generatedCopy.content);
-      alert('클립보드에 복사되었습니다.');
+      toast.success('클립보드에 복사되었습니다');
     }
   }
 

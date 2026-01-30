@@ -21,7 +21,9 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { productsApi } from '@/lib/api-client';
-import { Plus, Pencil, Trash2, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { EmptyState } from '@/components/ui/empty-state';
+import { Plus, Pencil, Trash2, X, Package } from 'lucide-react';
 import type { Product, ProductCreate } from '@/types';
 
 export function Products() {
@@ -60,8 +62,10 @@ export function Products() {
     try {
       if (editingProduct) {
         await productsApi.update(editingProduct.id, formData);
+        toast.success('상품이 수정되었습니다');
       } else {
         await productsApi.create(formData);
+        toast.success('상품이 추가되었습니다');
       }
       setDialogOpen(false);
       setEditingProduct(null);
@@ -69,6 +73,7 @@ export function Products() {
       fetchProducts();
     } catch (error) {
       console.error('Failed to save product:', error);
+      toast.error('오류가 발생했습니다');
     }
   }
 
@@ -76,9 +81,11 @@ export function Products() {
     if (!confirm('정말 삭제하시겠습니까?')) return;
     try {
       await productsApi.delete(id);
+      toast.success('상품이 삭제되었습니다');
       fetchProducts();
     } catch (error) {
       console.error('Failed to delete product:', error);
+      toast.error('오류가 발생했습니다');
     }
   }
 
@@ -252,7 +259,12 @@ export function Products() {
           {loading ? (
             <p>로딩 중...</p>
           ) : products.length === 0 ? (
-            <p className="text-muted-foreground">등록된 상품이 없습니다.</p>
+            <EmptyState
+              icon={Package}
+              title="등록된 상품이 없습니다"
+              description="새 상품을 추가하여 시작하세요"
+              action={<Button onClick={openCreateDialog}>새 상품 추가</Button>}
+            />
           ) : (
             <Table>
               <TableHeader>

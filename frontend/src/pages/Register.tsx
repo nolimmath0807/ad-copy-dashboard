@@ -9,6 +9,14 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
+function getPasswordStrength(password: string): { level: number; label: string; color: string } {
+  if (!password) return { level: 0, label: '', color: '' };
+  const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+  if (password.length >= 12 && hasSpecial) return { level: 3, label: '강함', color: 'bg-green-500' };
+  if (password.length >= 8) return { level: 2, label: '보통', color: 'bg-yellow-500' };
+  return { level: 1, label: '약함', color: 'bg-red-500' };
+}
+
 export default function Register() {
   const navigate = useNavigate();
   const { register } = useAuth();
@@ -19,6 +27,7 @@ export default function Register() {
   const [teamId, setTeamId] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const strength = getPasswordStrength(password);
 
   useEffect(() => {
     teamsApi.list().then(setTeams);
@@ -74,6 +83,25 @@ export default function Register() {
                 placeholder="••••••••"
                 required
               />
+              {password && (
+                <div className="space-y-1">
+                  <div className="flex gap-1">
+                    {[1, 2, 3].map(i => (
+                      <div
+                        key={i}
+                        className={`h-1.5 flex-1 rounded-full ${
+                          i <= strength.level ? strength.color : 'bg-muted'
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className={`text-xs ${
+                    strength.level === 1 ? 'text-red-500' : strength.level === 2 ? 'text-yellow-600' : 'text-green-600'
+                  }`}>
+                    {strength.label}
+                  </p>
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="name">이름</Label>
