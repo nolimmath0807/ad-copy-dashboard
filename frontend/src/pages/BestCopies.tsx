@@ -173,13 +173,16 @@ export function BestCopies() {
     setLoading(true);
     const checklists = await checklistsApi.listWithUtm();
 
-    const utmRows: { utmCode: string; checklist: Checklist }[] = [];
+    const utmMap = new Map<string, { utmCode: string; checklist: Checklist }>();
     for (const cl of checklists) {
       const codes = parseUtmCodes(cl.utm_code);
       for (const code of codes) {
-        utmRows.push({ utmCode: code, checklist: cl });
+        if (!utmMap.has(code)) {
+          utmMap.set(code, { utmCode: code, checklist: cl });
+        }
       }
     }
+    const utmRows = [...utmMap.values()];
 
     const uniqueUtmCodes = [...new Set(utmRows.map(r => r.utmCode))];
 
