@@ -17,15 +17,15 @@ def check_alive_ads(utm_codes: list[str]) -> dict:
     placeholders = ",".join(["%s"] * len(utm_codes))
     sql = f"""
         SELECT
-            regexp_replace(ad_code, '\\(.*\\)$', '') AS utm_code,
+            regexp_replace(ad_code, '^\\[[^]]*\\]', '') AS utm_code,
             MAX(date) AS last_spend_date,
             COALESCE(SUM(spend), 0) AS total_spend
         FROM ad_performance.meta_daily_perform
-        WHERE regexp_replace(ad_code, '\\(.*\\)$', '') IN ({placeholders})
+        WHERE regexp_replace(ad_code, '^\\[[^]]*\\]', '') IN ({placeholders})
           AND date >= %s
           AND date <= %s
           AND spend > 0
-        GROUP BY regexp_replace(ad_code, '\\(.*\\)$', '')
+        GROUP BY regexp_replace(ad_code, '^\\[[^]]*\\]', '')
     """
 
     params = utm_codes + [start_date, end_date]
