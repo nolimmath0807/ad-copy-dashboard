@@ -54,7 +54,7 @@ def get_performance_by_utm_codes(utm_codes: list[str], month: str) -> dict:
                 SELECT ad_code AS utm_code,
                     COALESCE(SUM(revenue), 0) AS revenue,
                     COALESCE(SUM(conversions), 0) AS conversions
-                FROM ad_performance.cafe24_daily_perform_2
+                FROM ad_performance.cafe24_daily_perform
                 WHERE ad_code IN ({placeholders})
                     AND date >= %s AND date < %s
                 GROUP BY 1
