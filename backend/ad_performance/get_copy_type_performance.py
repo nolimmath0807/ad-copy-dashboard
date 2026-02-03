@@ -64,12 +64,14 @@ def get_performance_by_copy_type(month: str, team_id: str = None) -> list[dict]:
                 "total_spend": 0.0,
                 "total_impressions": 0,
                 "total_clicks": 0,
+                "total_revenue": 0,
                 "utm_count": 0,
             }
         g = groups[copy_type_code]
         g["total_spend"] += perf.get("spend", 0)
         g["total_impressions"] += perf.get("impressions", 0)
         g["total_clicks"] += perf.get("clicks", 0)
+        g["total_revenue"] += perf.get("revenue", 0)
         g["utm_count"] += 1
 
     result = []
@@ -78,6 +80,11 @@ def get_performance_by_copy_type(month: str, team_id: str = None) -> list[dict]:
             round(g["total_clicks"] / g["total_impressions"] * 100, 2)
             if g["total_impressions"] > 0
             else 0.0
+        )
+        g["roas"] = (
+            round(g["total_revenue"] / g["total_spend"] * 100, 0)
+            if g["total_spend"] > 0
+            else 0
         )
         result.append(g)
 

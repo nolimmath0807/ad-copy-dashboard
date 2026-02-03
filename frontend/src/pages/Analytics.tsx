@@ -73,6 +73,8 @@ export default function Analytics() {
   const totalImpressions = data.reduce((s, d) => s + d.total_impressions, 0);
   const totalClicks = data.reduce((s, d) => s + d.total_clicks, 0);
   const avgCtr = totalImpressions > 0 ? (totalClicks / totalImpressions) * 100 : 0;
+  const totalRevenue = data.reduce((s, d) => s + d.total_revenue, 0);
+  const avgRoas = totalSpend > 0 ? Math.round(totalRevenue / totalSpend * 100) : 0;
 
   return (
     <div className="space-y-6">
@@ -105,7 +107,7 @@ export default function Analytics() {
         </CardContent>
       </Card>
 
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-6 gap-4">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">총 광고비</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold">{totalSpend.toLocaleString()}원</p></CardContent>
@@ -122,6 +124,14 @@ export default function Analytics() {
           <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">평균 CTR</CardTitle></CardHeader>
           <CardContent><p className="text-2xl font-bold">{avgCtr.toFixed(2)}%</p></CardContent>
         </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">총 매출액</CardTitle></CardHeader>
+          <CardContent><p className="text-2xl font-bold">{totalRevenue.toLocaleString()}원</p></CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-muted-foreground">평균 ROAS</CardTitle></CardHeader>
+          <CardContent><p className="text-2xl font-bold">{avgRoas}%</p></CardContent>
+        </Card>
       </div>
 
       {!loading && data.length > 0 && (
@@ -136,12 +146,13 @@ export default function Analytics() {
                 <YAxis yAxisId="right" orientation="right" />
                 <Tooltip formatter={(value, name) => {
                   const v = Number(value);
-                  if (name === '광고비') return [currencyFmt.format(v), name];
+                  if (name === '광고비' || name === '매출액') return [currencyFmt.format(v), name];
                   if (name === '평균 CTR') return [`${v.toFixed(2)}%`, name];
                   return [v.toLocaleString(), name];
                 }} />
                 <Legend />
                 <Bar yAxisId="left" dataKey="total_spend" name="광고비" fill="#8884d8" />
+                <Bar yAxisId="left" dataKey="total_revenue" name="매출액" fill="#ffc658" />
                 <Bar yAxisId="right" dataKey="avg_ctr" name="평균 CTR" fill="#82ca9d" />
               </BarChart>
             </ResponsiveContainer>
@@ -179,6 +190,14 @@ export default function Analytics() {
                   CTR
                   {sortKey === 'avg_ctr' ? (sortDir === 'asc' ? <ArrowUp className="ml-1 h-3 w-3 inline" /> : <ArrowDown className="ml-1 h-3 w-3 inline" />) : <ArrowUpDown className="ml-1 h-3 w-3 inline opacity-40" />}
                 </th>
+                <th className="pb-2 text-right cursor-pointer select-none" onClick={() => handleSort('total_revenue')}>
+                  매출액
+                  {sortKey === 'total_revenue' ? (sortDir === 'asc' ? <ArrowUp className="ml-1 h-3 w-3 inline" /> : <ArrowDown className="ml-1 h-3 w-3 inline" />) : <ArrowUpDown className="ml-1 h-3 w-3 inline opacity-40" />}
+                </th>
+                <th className="pb-2 text-right cursor-pointer select-none" onClick={() => handleSort('roas')}>
+                  ROAS
+                  {sortKey === 'roas' ? (sortDir === 'asc' ? <ArrowUp className="ml-1 h-3 w-3 inline" /> : <ArrowDown className="ml-1 h-3 w-3 inline" />) : <ArrowUpDown className="ml-1 h-3 w-3 inline opacity-40" />}
+                </th>
                 <th className="pb-2 text-right cursor-pointer select-none" onClick={() => handleSort('utm_count')}>
                   UTM 수
                   {sortKey === 'utm_count' ? (sortDir === 'asc' ? <ArrowUp className="ml-1 h-3 w-3 inline" /> : <ArrowDown className="ml-1 h-3 w-3 inline" />) : <ArrowUpDown className="ml-1 h-3 w-3 inline opacity-40" />}
@@ -194,6 +213,8 @@ export default function Analytics() {
                   <td className="py-2 text-right">{row.total_impressions.toLocaleString()}</td>
                   <td className="py-2 text-right">{row.total_clicks.toLocaleString()}</td>
                   <td className="py-2 text-right">{row.avg_ctr.toFixed(2)}%</td>
+                  <td className="py-2 text-right">{currencyFmt.format(row.total_revenue)}</td>
+                  <td className="py-2 text-right">{row.roas}%</td>
                   <td className="py-2 text-right">{row.utm_count.toLocaleString()}</td>
                 </tr>
               ))}

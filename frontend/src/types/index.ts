@@ -208,6 +208,8 @@ export interface CopyTypePerformance {
   total_clicks: number;
   avg_ctr: number;
   utm_count: number;
+  total_revenue: number;
+  roas: number;
 }
 
 // Weekly Team Performance
