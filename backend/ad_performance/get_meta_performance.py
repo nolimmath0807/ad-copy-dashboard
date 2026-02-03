@@ -22,15 +22,21 @@ def get_performance_by_utm_codes(utm_codes: list[str], month: str) -> dict:
 
     try:
         # month에서 시작/종료 날짜 계산
-        year, m = month.split('-')
-        start_date = f"{year}-{m}-01"
-        # 다음 달 1일 계산
-        next_month = int(m) + 1
-        next_year = int(year)
-        if next_month > 12:
-            next_month = 1
-            next_year += 1
-        end_date = f"{next_year}-{str(next_month).zfill(2)}-01"
+        if month == "all":
+            date_filter = ""
+            date_params = []
+        else:
+            year, m = month.split('-')
+            start_date = f"{year}-{m}-01"
+            # 다음 달 1일 계산
+            next_month = int(m) + 1
+            next_year = int(year)
+            if next_month > 12:
+                next_month = 1
+                next_year += 1
+            end_date = f"{next_year}-{str(next_month).zfill(2)}-01"
+            date_filter = "AND date >= %s AND date < %s"
+            date_params = [start_date, end_date]
 
         placeholders = ','.join(['%s'] * len(utm_codes))
         sql = f"""
@@ -47,7 +53,7 @@ def get_performance_by_utm_codes(utm_codes: list[str], month: str) -> dict:
                         ELSE 0 END AS cpc
                 FROM ad_performance.meta_daily_perform
                 WHERE regexp_replace(ad_code, '^\\[[^]]*\\]', '') IN ({placeholders})
-                    AND date >= %s AND date < %s
+                    {date_filter}
                 GROUP BY 1
             ),
             cafe AS (
@@ -56,7 +62,7 @@ def get_performance_by_utm_codes(utm_codes: list[str], month: str) -> dict:
                     COALESCE(SUM(conversions), 0) AS conversions
                 FROM ad_performance.cafe24_daily_perform
                 WHERE ad_code IN ({placeholders})
-                    AND date >= %s AND date < %s
+                    {date_filter}
                 GROUP BY 1
             )
             SELECT m.utm_code, m.spend, m.impressions, m.clicks, m.ctr, m.cpc,
@@ -66,7 +72,7 @@ def get_performance_by_utm_codes(utm_codes: list[str], month: str) -> dict:
             FROM meta m LEFT JOIN cafe c ON m.utm_code = c.utm_code
         """
 
-        params = utm_codes + [start_date, end_date] + utm_codes + [start_date, end_date]
+        params = utm_codes + date_params + utm_codes + date_params
         cur.execute(sql, params)
 
         columns = [desc[0] for desc in cur.description]
@@ -103,6 +109,6 @@ def main(utm_codes: list[str], month: str):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Get Meta ad performance by UTM codes")
     parser.add_argument("--utm-codes", nargs="+", required=True, help="UTM codes to look up")
-    parser.add_argument("--month", required=True, help="Month in YYYY-MM format")
+    parser.add_argument("--month", required=True, help="Month in YYYY-MM format, or 'all' for all-time")
     args = parser.parse_args()
     main(args.utm_codes, args.month)

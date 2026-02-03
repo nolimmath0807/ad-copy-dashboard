@@ -87,6 +87,7 @@ export default function Analytics() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="all">전체기간</SelectItem>
               {months.map((m) => (
                 <SelectItem key={m} value={m}>{m}</SelectItem>
               ))}

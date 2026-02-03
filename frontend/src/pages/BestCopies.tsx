@@ -293,6 +293,7 @@ export function BestCopies() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="all">전체기간</SelectItem>
                 {monthOptions.map(month => (
                   <SelectItem key={month} value={month}>
                     {formatMonth(month)}
