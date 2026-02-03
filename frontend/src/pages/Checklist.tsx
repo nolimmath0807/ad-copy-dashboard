@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { Header } from '@/components/layout/Header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,10 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { productsApi, copyTypesApi, checklistsApi, teamsApi, teamProductsApi } from '@/lib/api-client';
+import { HoverCard, HoverCardTrigger, HoverCardContent } from '@/components/ui/hover-card';
+import { productsApi, copyTypesApi, checklistsApi, teamsApi, teamProductsApi, adPerformanceApi } from '@/lib/api-client';
 import { useAuth } from '@/contexts/AuthContext';
-import { AlertTriangle, Ban, Check, X, Plus, RefreshCw } from 'lucide-react';
-import type { Product, CopyType, Checklist as ChecklistType, Team } from '@/types';
+import { AlertTriangle, Ban, Check, X, Plus, RefreshCw, Loader2 } from 'lucide-react';
+import type { Product, CopyType, Checklist as ChecklistType, Team, AdPerformance } from '@/types';
 
 // UTM 코드 문자열을 배열로 파싱 (기존 단일 문자열도 호환)
 function parseUtmCodes(utmCode: string | null): string[] {
@@ -27,6 +28,17 @@ function parseUtmCodes(utmCode: string | null): string[] {
 function stringifyUtmCodes(codes: string[]): string | null {
   if (codes.length === 0) return null;
   return JSON.stringify(codes);
+}
+
+// 금액 포맷
+function formatWon(value: number): string {
+  return `₩${Math.round(value).toLocaleString('ko-KR')}`;
+}
+
+// 현재 월 (YYYY-MM)
+function getCurrentMonth(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
 // 현재 주차 계산 함수
@@ -109,6 +121,28 @@ export function Checklist() {
   const [lastWeekIncomplete, setLastWeekIncomplete] = useState(0);
   const [utmData, setUtmData] = useState<Record<string, string[]>>({});
   const [newUtmInput, setNewUtmInput] = useState<Record<string, string>>({});
+
+  // Performance data cache: key = sorted utm codes joined, value = fetched data
+  const perfCacheRef = useRef<Record<string, Record<string, AdPerformance>>>({});
+  const [perfData, setPerfData] = useState<Record<string, Record<string, AdPerformance>>>({});
+  const [perfLoading, setPerfLoading] = useState<Record<string, boolean>>({});
+
+  const fetchPerformance = useCallback(async (codes: string[]) => {
+    if (codes.length === 0) return;
+    const cacheKey = [...codes].sort().join('|');
+    if (perfCacheRef.current[cacheKey]) {
+      setPerfData(prev => ({ ...prev, [cacheKey]: perfCacheRef.current[cacheKey] }));
+      return;
+    }
+    setPerfLoading(prev => ({ ...prev, [cacheKey]: true }));
+    const month = getCurrentMonth();
+    const result = await adPerformanceApi.getByUtmCodes(codes, month);
+    perfCacheRef.current[cacheKey] = result;
+    setPerfData(prev => ({ ...prev, [cacheKey]: result }));
+    setPerfLoading(prev => ({ ...prev, [cacheKey]: false }));
+  }, []);
+
+  const getPerfCacheKey = (codes: string[]) => [...codes].sort().join('|');
 
   const recentWeeks = getWeeksFromStart(SERVICE_START_WEEK);
   const isAdminOrLeader = user?.role === 'admin' || user?.role === 'leader';
@@ -503,7 +537,11 @@ export function Checklist() {
                                   <Ban className="h-3.5 w-3.5" />
                                 </button>
                               )}
+                              <HoverCard openDelay={300} closeDelay={100} onOpenChange={(open) => {
+                                if (open && hasUtm) fetchPerformance(codes);
+                              }}>
                               <Popover>
+                                <HoverCardTrigger asChild>
                                 <PopoverTrigger asChild>
                                   <button
                                     className={`w-full text-left text-xs px-2 py-1.5 rounded border flex items-center justify-between gap-1 hover:bg-muted/50 transition-colors ${
@@ -520,6 +558,7 @@ export function Checklist() {
                                     ) : null}
                                   </button>
                                 </PopoverTrigger>
+                                </HoverCardTrigger>
                                 <PopoverContent className="w-80" align="start">
                                   <div className="space-y-3">
                                     <div className="font-medium text-sm">UTM 코드 관리</div>
@@ -571,6 +610,63 @@ export function Checklist() {
                                   </div>
                                 </PopoverContent>
                               </Popover>
+                              {hasUtm && (
+                                <HoverCardContent side="top" align="start" className="p-3 w-auto max-w-lg">
+                                  {(() => {
+                                    const cacheKey = getPerfCacheKey(codes);
+                                    const isLoading = perfLoading[cacheKey];
+                                    const data = perfData[cacheKey];
+                                    if (isLoading || !data) {
+                                      return (
+                                        <div className="flex items-center gap-2 text-xs text-muted-foreground py-2">
+                                          <Loader2 className="h-3 w-3 animate-spin" />
+                                          <span>성과 데이터 로딩중...</span>
+                                        </div>
+                                      );
+                                    }
+                                    const hasAnyData = codes.some(c => data[c]);
+                                    if (!hasAnyData) {
+                                      return <div className="text-xs text-muted-foreground py-1">성과 데이터 없음</div>;
+                                    }
+                                    return (
+                                      <table className="text-xs border-collapse">
+                                        <thead>
+                                          <tr className="text-muted-foreground">
+                                            <th className="text-left pr-3 pb-1 font-medium">UTM</th>
+                                            <th className="text-right pr-3 pb-1 font-medium">광고비</th>
+                                            <th className="text-right pr-3 pb-1 font-medium">CPC</th>
+                                            <th className="text-right pr-3 pb-1 font-medium">CTR</th>
+                                            <th className="text-right pr-3 pb-1 font-medium">매출액</th>
+                                            <th className="text-right pb-1 font-medium">ROAS</th>
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {codes.map(code => {
+                                            const perf = data[code];
+                                            if (!perf) return (
+                                              <tr key={code} className="text-muted-foreground">
+                                                <td className="pr-3 py-0.5 font-mono truncate max-w-32">{code}</td>
+                                                <td colSpan={5} className="text-right py-0.5">-</td>
+                                              </tr>
+                                            );
+                                            return (
+                                              <tr key={code}>
+                                                <td className="pr-3 py-0.5 font-mono truncate max-w-32" title={code}>{code}</td>
+                                                <td className="text-right pr-3 py-0.5 whitespace-nowrap">{formatWon(perf.spend)}</td>
+                                                <td className="text-right pr-3 py-0.5 whitespace-nowrap">{formatWon(perf.cpc)}</td>
+                                                <td className="text-right pr-3 py-0.5 whitespace-nowrap">{perf.ctr.toFixed(2)}%</td>
+                                                <td className="text-right pr-3 py-0.5 whitespace-nowrap">{formatWon(perf.revenue)}</td>
+                                                <td className="text-right py-0.5 whitespace-nowrap">{Math.round(perf.roas)}%</td>
+                                              </tr>
+                                            );
+                                          })}
+                                        </tbody>
+                                      </table>
+                                    );
+                                  })()}
+                                </HoverCardContent>
+                              )}
+                              </HoverCard>
                               </div>
                             ) : (
                               <span className="text-muted-foreground text-center block">-</span>
