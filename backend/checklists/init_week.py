@@ -61,7 +61,7 @@ def init_week_checklists(week: str = None):
 
     alive_results = {}
     if all_utm_codes:
-        alive_results = check_alive_ads(list(all_utm_codes))
+        alive_results = check_alive_ads(list(all_utm_codes), week)
 
     # 누락된 조합만 생성
     new_checklists = []
