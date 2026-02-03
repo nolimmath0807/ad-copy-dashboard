@@ -53,7 +53,11 @@ def get_performance_by_copy_type(month: str, team_id: str = None) -> list[dict]:
     perf_map = get_performance_by_utm_codes(utm_codes, month)
 
     groups = {}
+    seen = set()
     for utm_code, copy_type_code, copy_type_name in parsed_rows:
+        if (utm_code, copy_type_code) in seen:
+            continue
+        seen.add((utm_code, copy_type_code))
         perf = perf_map.get(utm_code)
         if not perf:
             continue
