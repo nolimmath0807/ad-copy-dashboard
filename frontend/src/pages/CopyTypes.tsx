@@ -24,7 +24,6 @@ import { copyTypesApi } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Pencil, Trash2, FileText, AlertTriangle, Loader2, Sparkles } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import type { CopyType, CopyTypeCreate } from '@/types';
 
