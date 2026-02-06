@@ -55,6 +55,7 @@ export function CopyTypes() {
     similar_types: Array<{ id: string; code: string; name: string; structure_similarity: number; persuasion_similarity: number; similarity_percent: number; reason: string }>;
   } | null>(null);
   const [pendingCreateData, setPendingCreateData] = useState<CopyTypeCreate | null>(null);
+  const [choiceDialogOpen, setChoiceDialogOpen] = useState(false);
 
   // Edit state (keeps existing form)
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -103,11 +104,25 @@ export function CopyTypes() {
         prompt_template: '',
       };
 
-      if (result.is_similar) {
+      if (result.is_similar && result.similar_types.length > 0) {
+        const maxStructure = Math.max(...result.similar_types.map(st => st.structure_similarity || 0));
+
         setPendingCreateData(createData);
         setSimilarityResult(result);
         setScriptDialogOpen(false);
-        setSimilarityDialogOpen(true);
+
+        if (maxStructure >= 92) {
+          // Definite similar - show confirmation (can only add as child)
+          setSimilarityDialogOpen(true);
+        } else if (maxStructure >= 80) {
+          // Ambiguous - let user choose
+          setChoiceDialogOpen(true);
+        } else {
+          // Below 80% - auto create
+          await copyTypesApi.create(createData);
+          toast.success(`원고유형 "${createData.name}" (${createData.code})이 자동 생성되었습니다`);
+          fetchCopyTypes();
+        }
       } else {
         await copyTypesApi.create(createData);
         toast.success(`원고유형 "${createData.name}" (${createData.code})이 자동 생성되었습니다`);
@@ -139,6 +154,45 @@ export function CopyTypes() {
       await copyTypesApi.create(childData);
       toast.success(`"${rootParent?.name || mostSimilar.name}" 하위에 "${childData.variant_name}" 변형이 생성되었습니다`);
       setSimilarityDialogOpen(false);
+      setSimilarityResult(null);
+      setPendingCreateData(null);
+      fetchCopyTypes();
+    } catch {
+      toast.error('생성 중 오류가 발생했습니다');
+    }
+  }
+
+  async function handleCreateAsNew() {
+    if (!pendingCreateData) return;
+    try {
+      await copyTypesApi.create(pendingCreateData);
+      toast.success(`신규 원고유형 "${pendingCreateData.name}" (${pendingCreateData.code})이 생성되었습니다`);
+      setChoiceDialogOpen(false);
+      setSimilarityResult(null);
+      setPendingCreateData(null);
+      fetchCopyTypes();
+    } catch {
+      toast.error('생성 중 오류가 발생했습니다');
+    }
+  }
+
+  async function handleCreateAsChild() {
+    if (!pendingCreateData || !similarityResult) return;
+    try {
+      const mostSimilar = similarityResult.similar_types.reduce((a, b) =>
+        a.structure_similarity > b.structure_similarity ? a : b
+      );
+      const similarType = copyTypes.find(ct => ct.id === mostSimilar.id);
+      const rootParentId = similarType?.parent_id || mostSimilar.id;
+      const rootParent = copyTypes.find(ct => ct.id === rootParentId);
+      const childData: CopyTypeCreate = {
+        ...pendingCreateData,
+        parent_id: rootParentId,
+        variant_name: pendingCreateData.name,
+      };
+      await copyTypesApi.create(childData);
+      toast.success(`"${rootParent?.name || mostSimilar.name}" 하위에 "${childData.variant_name}" 변형이 생성되었습니다`);
+      setChoiceDialogOpen(false);
       setSimilarityResult(null);
       setPendingCreateData(null);
       fetchCopyTypes();
@@ -342,7 +396,7 @@ export function CopyTypes() {
               유사한 원고 유형이 존재합니다
             </DialogTitle>
             <DialogDescription>
-              입력한 원고가 기존 유형과 80% 이상 유사합니다. 그래도 추가하시겠습니까?
+              입력한 원고의 구조가 기존 유형과 92% 이상 일치합니다. 기존 유형의 하위 변형으로 등록됩니다.
             </DialogDescription>
           </DialogHeader>
           {pendingCreateData && (
@@ -438,8 +492,84 @@ export function CopyTypes() {
             <Button variant="outline" onClick={() => setSimilarityDialogOpen(false)} className="border-gray-300">
               취소
             </Button>
-            <Button onClick={handleForceCreate} className="bg-red-600 text-white hover:bg-red-700">
-              그래도 추가
+            <Button onClick={handleForceCreate} className="bg-primary text-primary-foreground hover:bg-primary/90">
+              하위 변형으로 등록
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Choice Dialog (80-91% structure similarity) */}
+      <Dialog open={choiceDialogOpen} onOpenChange={setChoiceDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-blue-600">
+              <AlertTriangle className="h-5 w-5" />
+              유사한 원고 유형이 감지되었습니다
+            </DialogTitle>
+            <DialogDescription>
+              구조 유사도 80~91% 범위입니다. 신규 유형으로 등록할지, 기존 유형의 하위 변형으로 등록할지 선택하세요.
+            </DialogDescription>
+          </DialogHeader>
+          {pendingCreateData && (
+            <div className="rounded-lg bg-muted p-3 text-sm space-y-1">
+              <p><span className="font-medium">추출된 코드:</span> {pendingCreateData.code}</p>
+              <p><span className="font-medium">추출된 이름:</span> {pendingCreateData.name}</p>
+              <p><span className="font-medium">핵심 콘셉트:</span> {pendingCreateData.core_concept}</p>
+            </div>
+          )}
+          <div className="space-y-4 py-2">
+            {similarityResult?.similar_types.map((item, idx) => {
+              const structureReason = item.reason.includes('1차(구조):')
+                ? item.reason.split('1차(구조):')[1]?.split('/')[0]?.trim() || ''
+                : '';
+              const persuasionReason = item.reason.includes('2차(설득기조):')
+                ? item.reason.split('2차(설득기조):')[1]?.trim() || ''
+                : '';
+
+              return (
+                <div key={idx} className="rounded-xl border-2 border-blue-200 bg-blue-50/50 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-base text-gray-900">{item.code} - {item.name}</span>
+                    <span className="inline-flex items-center rounded-md font-bold text-sm px-3 py-1 border bg-blue-500 text-white border-blue-600">
+                      구조 {item.structure_similarity || 0}%
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-blue-700">1차 구조 유사도</span>
+                        <span className="font-mono font-bold text-gray-900">{item.structure_similarity || 0}%</span>
+                      </div>
+                      <div className="h-2.5 rounded-full bg-gray-200 overflow-hidden">
+                        <div className="h-full rounded-full transition-all bg-blue-400" style={{ width: `${item.structure_similarity || 0}%` }} />
+                      </div>
+                      {structureReason && <p className="text-xs text-gray-600 pl-1">{structureReason}</p>}
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-bold text-gray-500">2차 설득기조 유사도</span>
+                        <span className="font-mono font-bold text-gray-900">{item.persuasion_similarity || 0}%</span>
+                      </div>
+                      <div className="h-2.5 rounded-full bg-gray-200 overflow-hidden">
+                        <div className="h-full rounded-full transition-all bg-gray-400" style={{ width: `${item.persuasion_similarity || 0}%` }} />
+                      </div>
+                      {persuasionReason && <p className="text-xs text-gray-600 pl-1">{persuasionReason}</p>}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          <DialogFooter className="flex gap-2 sm:gap-2">
+            <Button variant="outline" onClick={() => setChoiceDialogOpen(false)} className="border-gray-300">
+              취소
+            </Button>
+            <Button onClick={handleCreateAsNew} className="bg-emerald-600 text-white hover:bg-emerald-700">
+              신규 유형으로 등록
+            </Button>
+            <Button onClick={handleCreateAsChild} className="bg-blue-600 text-white hover:bg-blue-700">
+              하위 변형으로 등록
             </Button>
           </DialogFooter>
         </DialogContent>

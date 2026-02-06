@@ -74,7 +74,7 @@ ANALYZE_PROMPT = """
 }}
 ```
 
-최종 유사도(similarity_percent) 80% 이상인 유형만 similar_types에 포함하세요.
+구조 유사도(structure_similarity) 80% 이상인 유형만 similar_types에 포함하세요.
 유사한 유형이 없으면 similar_types를 빈 배열로 두세요.
 """
 
