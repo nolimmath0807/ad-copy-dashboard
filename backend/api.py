@@ -50,6 +50,8 @@ from best_copies.create_best import create_best_copy
 # AI
 from ai.generate_copy import generate_ad_copy
 from ai.regenerate_copy import regenerate_copy
+from ai.check_similarity import check_copy_type_similarity
+from ai.analyze_copy_type import analyze_and_check
 
 # Dashboard
 from dashboard.get_summary import get_dashboard_summary
@@ -146,6 +148,8 @@ class CopyTypeCreate(BaseModel):
     core_concept: Optional[str] = None
     example_copy: Optional[str] = None
     prompt_template: Optional[str] = None
+    parent_id: Optional[str] = None
+    variant_name: Optional[str] = None
 
 
 class CopyTypeUpdate(BaseModel):
@@ -155,6 +159,17 @@ class CopyTypeUpdate(BaseModel):
     core_concept: Optional[str] = None
     example_copy: Optional[str] = None
     prompt_template: Optional[str] = None
+    variant_name: Optional[str] = None
+
+
+class CopyTypeSimilarityCheck(BaseModel):
+    core_concept: Optional[str] = None
+    description: Optional[str] = None
+    example_copy: Optional[str] = None
+
+
+class CopyTypeAutoAnalyze(BaseModel):
+    script_text: str
 
 
 # Generated Copy Models
@@ -299,6 +314,21 @@ def api_delete_product(id: str, authorization: str = Header(None)):
 @app.get("/api/copy-types")
 def api_list_copy_types():
     return list_copy_types()
+
+
+@app.post("/api/copy-types/check-similarity")
+def api_check_copy_type_similarity(data: CopyTypeSimilarityCheck):
+    existing_types = list_copy_types()
+    new_data = data.model_dump()
+    result = check_copy_type_similarity(new_data, existing_types)
+    return result
+
+
+@app.post("/api/copy-types/auto-analyze")
+def api_auto_analyze_copy_type(data: CopyTypeAutoAnalyze):
+    existing_types = list_copy_types()
+    result = analyze_and_check(data.script_text, existing_types)
+    return result
 
 
 @app.get("/api/copy-types/{id}")

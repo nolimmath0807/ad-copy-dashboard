@@ -65,6 +65,20 @@ export const copyTypesApi = {
   create: (data: CopyTypeCreate) => fetchAPI<CopyType>('/api/copy-types', { method: 'POST', body: JSON.stringify(data) }),
   update: (id: string, data: CopyTypeUpdate) => fetchAPI<CopyType>(`/api/copy-types/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   delete: (id: string) => fetchAPI<void>(`/api/copy-types/${id}`, { method: 'DELETE' }),
+  checkSimilarity: (data: { core_concept?: string; description?: string; example_copy?: string }) =>
+    fetchAPI<{ is_similar: boolean; similar_types: Array<{ code: string; name: string; similarity_percent: number; reason: string }> }>(
+      '/api/copy-types/check-similarity',
+      { method: 'POST', body: JSON.stringify(data) }
+    ),
+  autoAnalyze: (scriptText: string) =>
+    fetchAPI<{
+      extracted: { code: string; name: string; core_concept: string; description: string } | null;
+      is_similar: boolean;
+      similar_types: Array<{ code: string; name: string; similarity_percent: number; reason: string }>;
+    }>('/api/copy-types/auto-analyze', {
+      method: 'POST',
+      body: JSON.stringify({ script_text: scriptText }),
+    }),
 };
 
 // Copies API

@@ -11,7 +11,6 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import {
   Table,
@@ -24,7 +23,9 @@ import {
 import { copyTypesApi } from '@/lib/api-client';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Plus, Pencil, Trash2, FileText } from 'lucide-react';
+import { Pencil, Trash2, FileText, AlertTriangle, Loader2, Sparkles } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/contexts/AuthContext';
 import type { CopyType, CopyTypeCreate } from '@/types';
 
 const initialFormData: CopyTypeCreate = {
@@ -34,12 +35,30 @@ const initialFormData: CopyTypeCreate = {
   core_concept: '',
   example_copy: '',
   prompt_template: '',
+  variant_name: '',
 };
 
 export function CopyTypes() {
   const [copyTypes, setCopyTypes] = useState<CopyType[]>([]);
   const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const { user } = useAuth();
+  const canManage = user?.role === 'admin' || user?.role === 'leader';
+
+  // Script auto-create state
+  const [scriptDialogOpen, setScriptDialogOpen] = useState(false);
+  const [scriptText, setScriptText] = useState('');
+  const [analyzing, setAnalyzing] = useState(false);
+
+  // Similarity warning state
+  const [similarityDialogOpen, setSimilarityDialogOpen] = useState(false);
+  const [similarityResult, setSimilarityResult] = useState<{
+    is_similar: boolean;
+    similar_types: Array<{ id: string; code: string; name: string; similarity_percent: number; reason: string }>;
+  } | null>(null);
+  const [pendingCreateData, setPendingCreateData] = useState<CopyTypeCreate | null>(null);
+
+  // Edit state (keeps existing form)
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<CopyTypeCreate>(initialFormData);
 
@@ -54,12 +73,82 @@ export function CopyTypes() {
     setLoading(false);
   }
 
-  function handleOpenCreate() {
-    setEditingId(null);
-    setFormData(initialFormData);
-    setDialogOpen(true);
+  // === Script Auto-Create Flow ===
+  function handleOpenScriptDialog() {
+    setScriptText('');
+    setScriptDialogOpen(true);
   }
 
+  async function handleAnalyzeAndCreate() {
+    if (!scriptText.trim()) {
+      toast.error('원고 스크립트를 입력해주세요');
+      return;
+    }
+
+    setAnalyzing(true);
+    try {
+      const result = await copyTypesApi.autoAnalyze(scriptText);
+      setAnalyzing(false);
+
+      if (!result.extracted) {
+        toast.error('AI 분석에 실패했습니다. 다시 시도해주세요.');
+        return;
+      }
+
+      const createData: CopyTypeCreate = {
+        code: result.extracted.code,
+        name: result.extracted.name,
+        core_concept: result.extracted.core_concept,
+        description: result.extracted.description,
+        example_copy: scriptText,
+        prompt_template: '',
+      };
+
+      if (result.is_similar) {
+        setPendingCreateData(createData);
+        setSimilarityResult(result);
+        setScriptDialogOpen(false);
+        setSimilarityDialogOpen(true);
+      } else {
+        await copyTypesApi.create(createData);
+        toast.success(`원고유형 "${createData.name}" (${createData.code})이 자동 생성되었습니다`);
+        setScriptDialogOpen(false);
+        fetchCopyTypes();
+      }
+    } catch {
+      setAnalyzing(false);
+      toast.error('분석 중 오류가 발생했습니다');
+    }
+  }
+
+  async function handleForceCreate() {
+    if (!pendingCreateData || !similarityResult) return;
+    try {
+      // Find the most similar type (highest similarity_percent)
+      const mostSimilar = similarityResult.similar_types.reduce((a, b) =>
+        a.similarity_percent > b.similarity_percent ? a : b
+      );
+      // Resolve to root parent - if mostSimilar is a child, use its parent_id instead
+      const similarType = copyTypes.find(ct => ct.id === mostSimilar.id);
+      const rootParentId = similarType?.parent_id || mostSimilar.id;
+      const rootParent = copyTypes.find(ct => ct.id === rootParentId);
+      const childData: CopyTypeCreate = {
+        ...pendingCreateData,
+        parent_id: rootParentId,
+        variant_name: pendingCreateData.name,
+      };
+      await copyTypesApi.create(childData);
+      toast.success(`"${rootParent?.name || mostSimilar.name}" 하위에 "${childData.variant_name}" 변형이 생성되었습니다`);
+      setSimilarityDialogOpen(false);
+      setSimilarityResult(null);
+      setPendingCreateData(null);
+      fetchCopyTypes();
+    } catch {
+      toast.error('생성 중 오류가 발생했습니다');
+    }
+  }
+
+  // === Edit Flow (unchanged) ===
   function handleOpenEdit(copyType: CopyType) {
     setEditingId(copyType.id);
     setFormData({
@@ -69,20 +158,17 @@ export function CopyTypes() {
       core_concept: copyType.core_concept || '',
       example_copy: copyType.example_copy || '',
       prompt_template: copyType.prompt_template || '',
+      variant_name: copyType.variant_name || '',
     });
-    setDialogOpen(true);
+    setEditDialogOpen(true);
   }
 
-  async function handleSubmit() {
+  async function handleEditSubmit() {
+    if (!editingId) return;
     try {
-      if (editingId) {
-        await copyTypesApi.update(editingId, formData);
-        toast.success('원고유형이 수정되었습니다');
-      } else {
-        await copyTypesApi.create(formData);
-        toast.success('원고유형이 추가되었습니다');
-      }
-      setDialogOpen(false);
+      await copyTypesApi.update(editingId, formData);
+      toast.success('원고유형이 수정되었습니다');
+      setEditDialogOpen(false);
       fetchCopyTypes();
     } catch {
       toast.error('오류가 발생했습니다');
@@ -113,92 +199,12 @@ export function CopyTypes() {
           <p className="text-muted-foreground">
             광고 원고의 유형을 관리합니다. 각 유형별 핵심 콘셉트와 프롬프트 템플릿을 설정할 수 있습니다.
           </p>
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={handleOpenCreate}>
-                <Plus className="mr-2 h-4 w-4" />
-                유형 추가
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>{editingId ? '원고 유형 수정' : '새 원고 유형 추가'}</DialogTitle>
-                <DialogDescription>
-                  원고 유형의 정보를 입력하세요. 코드와 이름은 필수입니다.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="grid gap-4 py-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="code">코드 *</Label>
-                    <Input
-                      id="code"
-                      value={formData.code}
-                      onChange={(e) => handleChange('code', e.target.value)}
-                      placeholder="예: A1, B2"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="name">이름 *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => handleChange('name', e.target.value)}
-                      placeholder="예: 문제제기형"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="description">설명</Label>
-                  <Textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => handleChange('description', e.target.value)}
-                    placeholder="이 유형에 대한 설명"
-                    rows={2}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="core_concept">핵심 콘셉트</Label>
-                  <Textarea
-                    id="core_concept"
-                    value={formData.core_concept}
-                    onChange={(e) => handleChange('core_concept', e.target.value)}
-                    placeholder="이 유형의 핵심 콘셉트"
-                    rows={2}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="example_copy">예시 원고</Label>
-                  <Textarea
-                    id="example_copy"
-                    value={formData.example_copy}
-                    onChange={(e) => handleChange('example_copy', e.target.value)}
-                    placeholder="이 유형의 예시 원고"
-                    rows={4}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="prompt_template">프롬프트 템플릿</Label>
-                  <Textarea
-                    id="prompt_template"
-                    value={formData.prompt_template}
-                    onChange={(e) => handleChange('prompt_template', e.target.value)}
-                    placeholder="AI 생성용 프롬프트 템플릿"
-                    rows={4}
-                  />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setDialogOpen(false)}>
-                  취소
-                </Button>
-                <Button onClick={handleSubmit} disabled={!formData.code || !formData.name}>
-                  {editingId ? '수정' : '추가'}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          {canManage && (
+            <Button onClick={handleOpenScriptDialog} className="bg-primary text-primary-foreground hover:bg-primary/90">
+              <Sparkles className="mr-2 h-4 w-4" />
+              AI 유형 추가
+            </Button>
+          )}
         </div>
 
         {loading ? (
@@ -208,7 +214,7 @@ export function CopyTypes() {
             icon={FileText}
             title="등록된 원고유형이 없습니다"
             description="새 원고유형을 추가하여 시작하세요"
-            action={<Button onClick={handleOpenCreate}>새 원고유형 추가</Button>}
+            action={canManage ? <Button onClick={handleOpenScriptDialog} className="bg-primary text-primary-foreground hover:bg-primary/90"><Sparkles className="mr-2 h-4 w-4" />AI 유형 추가</Button> : undefined}
           />
         ) : (
           <Table>
@@ -223,10 +229,9 @@ export function CopyTypes() {
             </TableHeader>
             <TableBody>
               {copyTypes
-                .filter(ct => !ct.parent_id) // 부모 유형만 먼저 표시
+                .filter(ct => !ct.parent_id)
                 .map((parent) => (
                   <Fragment key={parent.id}>
-                    {/* 부모 유형 */}
                     <TableRow className="bg-muted/50">
                       <TableCell className="font-mono font-bold">{parent.code}</TableCell>
                       <TableCell className="font-bold">{parent.name}</TableCell>
@@ -237,25 +242,18 @@ export function CopyTypes() {
                         {parent.description || '-'}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleOpenEdit(parent)}
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handleDelete(parent.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        {canManage && (
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(parent)}>
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDelete(parent.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
-                    {/* 자식 유형들 */}
                     {copyTypes
                       .filter(ct => ct.parent_id === parent.id)
                       .map((child) => (
@@ -263,30 +261,22 @@ export function CopyTypes() {
                           <TableCell className="font-mono text-muted-foreground pl-6">
                             └ {child.code}
                           </TableCell>
-                          <TableCell className="text-sm">{child.variant_name}</TableCell>
+                          <TableCell className="text-sm">{child.variant_name || child.name}</TableCell>
                           <TableCell className="max-w-[300px] truncate text-xs text-muted-foreground">
                             {child.example_copy?.slice(0, 50)}...
                           </TableCell>
-                          <TableCell className="max-w-[300px] truncate text-xs">
-                            -
-                          </TableCell>
+                          <TableCell className="max-w-[300px] truncate text-xs">-</TableCell>
                           <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleOpenEdit(child)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={() => handleDelete(child.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
+                            {canManage && (
+                              <div className="flex justify-end gap-2">
+                                <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(child)}>
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => handleDelete(child.id)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -296,6 +286,192 @@ export function CopyTypes() {
           </Table>
         )}
       </div>
+
+      {/* Script Auto-Create Dialog */}
+      <Dialog open={scriptDialogOpen} onOpenChange={setScriptDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5" />
+              AI 원고 유형 자동 추가
+            </DialogTitle>
+            <DialogDescription>
+              원고 스크립트를 붙여넣으면 AI가 자동으로 유형을 분석하고 등록합니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-4">
+            <Label htmlFor="script">원고 스크립트</Label>
+            <Textarea
+              id="script"
+              value={scriptText}
+              onChange={(e) => setScriptText(e.target.value)}
+              placeholder="원고 스크립트를 여기에 붙여넣으세요..."
+              rows={12}
+              className="font-mono text-sm"
+            />
+            <p className="text-xs text-muted-foreground">
+              AI가 원고를 분석하여 코드, 이름, 핵심 콘셉트, 설명을 자동 추출하고, 기존 유형과의 유사도를 검사합니다.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setScriptDialogOpen(false)}>
+              취소
+            </Button>
+            <Button onClick={handleAnalyzeAndCreate} disabled={!scriptText.trim() || analyzing}>
+              {analyzing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  AI 분석 중...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  AI 분석 및 추가
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Similarity Warning Dialog */}
+      <Dialog open={similarityDialogOpen} onOpenChange={setSimilarityDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-amber-600">
+              <AlertTriangle className="h-5 w-5" />
+              유사한 원고 유형이 존재합니다
+            </DialogTitle>
+            <DialogDescription>
+              입력한 원고가 기존 유형과 80% 이상 유사합니다. 그래도 추가하시겠습니까?
+            </DialogDescription>
+          </DialogHeader>
+          {pendingCreateData && (
+            <div className="rounded-lg bg-muted p-3 text-sm space-y-1">
+              <p><span className="font-medium">추출된 코드:</span> {pendingCreateData.code}</p>
+              <p><span className="font-medium">추출된 이름:</span> {pendingCreateData.name}</p>
+              <p><span className="font-medium">핵심 콘셉트:</span> {pendingCreateData.core_concept}</p>
+            </div>
+          )}
+          <div className="space-y-3 py-2">
+            {similarityResult?.similar_types.map((item, idx) => (
+              <div key={idx} className="rounded-lg border p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium">{item.code} - {item.name}</span>
+                  <Badge variant={item.similarity_percent >= 90 ? "destructive" : "secondary"}>
+                    {item.similarity_percent}% 유사
+                  </Badge>
+                </div>
+                <p className="text-sm text-muted-foreground">{item.reason}</p>
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSimilarityDialogOpen(false)} className="border-gray-300">
+              취소
+            </Button>
+            <Button onClick={handleForceCreate} className="bg-red-600 text-white hover:bg-red-700">
+              그래도 추가
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Dialog (existing form) */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>원고 유형 수정</DialogTitle>
+            <DialogDescription>
+              원고 유형의 정보를 수정하세요. 코드와 이름은 필수입니다.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-code">코드 *</Label>
+                <Input
+                  id="edit-code"
+                  value={formData.code}
+                  onChange={(e) => handleChange('code', e.target.value)}
+                  placeholder="예: A1, B2"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-name">이름 *</Label>
+                <Input
+                  id="edit-name"
+                  value={formData.name}
+                  onChange={(e) => handleChange('name', e.target.value)}
+                  placeholder="예: 문제제기형"
+                />
+              </div>
+            </div>
+            {editingId && copyTypes.find(ct => ct.id === editingId)?.parent_id && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-variant_name">변형 이름</Label>
+                <Input
+                  id="edit-variant_name"
+                  value={formData.variant_name || ''}
+                  onChange={(e) => handleChange('variant_name', e.target.value)}
+                  placeholder="예: 긴급 강조형, 부드러운 어필형"
+                />
+                <p className="text-xs text-muted-foreground">
+                  부모 유형 하위의 변형을 구분하는 이름입니다.
+                </p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="edit-description">설명</Label>
+              <Textarea
+                id="edit-description"
+                value={formData.description}
+                onChange={(e) => handleChange('description', e.target.value)}
+                placeholder="이 유형에 대한 설명"
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-core_concept">핵심 콘셉트</Label>
+              <Textarea
+                id="edit-core_concept"
+                value={formData.core_concept}
+                onChange={(e) => handleChange('core_concept', e.target.value)}
+                placeholder="이 유형의 핵심 콘셉트"
+                rows={2}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-example_copy">예시 원고</Label>
+              <Textarea
+                id="edit-example_copy"
+                value={formData.example_copy}
+                onChange={(e) => handleChange('example_copy', e.target.value)}
+                placeholder="이 유형의 예시 원고"
+                rows={4}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="edit-prompt_template">프롬프트 템플릿</Label>
+              <Textarea
+                id="edit-prompt_template"
+                value={formData.prompt_template}
+                onChange={(e) => handleChange('prompt_template', e.target.value)}
+                placeholder="AI 생성용 프롬프트 템플릿"
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>
+              취소
+            </Button>
+            <Button onClick={handleEditSubmit} disabled={!formData.code || !formData.name}>
+              수정
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
