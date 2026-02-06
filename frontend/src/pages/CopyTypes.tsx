@@ -316,9 +316,11 @@ export function CopyTypes() {
                           </TableCell>
                           <TableCell className="text-sm">{child.variant_name || child.name}</TableCell>
                           <TableCell className="max-w-[300px] truncate text-xs text-muted-foreground">
-                            {child.example_copy?.slice(0, 50)}...
+                            {child.core_concept || '-'}
                           </TableCell>
-                          <TableCell className="max-w-[300px] truncate text-xs">-</TableCell>
+                          <TableCell className="max-w-[300px] truncate text-xs text-muted-foreground">
+                            {child.description || '-'}
+                          </TableCell>
                           <TableCell className="text-right">
                             {canManage && (
                               <div className="flex justify-end gap-2">
