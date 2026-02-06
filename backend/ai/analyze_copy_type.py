@@ -17,13 +17,33 @@ ANALYZE_PROMPT = """
 ## 작업
 아래 "신규 원고"를 분석하여:
 1. 이 원고의 유형 코드(code), 이름(name), 핵심 콘셉트(core_concept), 설명(description)을 추출하세요.
-2. 기존 원고 유형 목록과 비교하여 유사도(%)를 판단하세요.
+2. 기존 원고 유형 목록과 **2단계 유사도 검사**를 수행하세요.
 
 ## 신규 원고
 {script_text}
 
 ## 기존 원고 유형 목록
 {existing_types_text}
+
+## 2단계 유사도 검사 기준
+
+### 1단계: 구조 유사도 (structure_similarity)
+원고의 **전체 구조/뼈대**가 동일한지 판단합니다.
+- 문장 배치 순서, 단락 구성, 흐름 패턴이 같은가?
+- 상품명/브랜드명/키워드만 바꾸고 나머지 틀은 그대로인 베리에이션인가?
+- 예: "A 상품이 고민이시라면?" → "B 상품이 고민이시라면?" 는 구조가 동일(95%+)
+- 구조가 완전히 다르면 낮은 점수 (30% 이하)
+
+### 2단계: 설득 기조 유사도 (persuasion_similarity)
+원고 구조가 다르더라도 **무엇으로 설득하는지**가 같은지 판단합니다.
+- 소비자의 어떤 심리/니즈를 자극하는가? (공포, 호기심, 사회적 증거, 긴급성 등)
+- 어떤 논리 구조로 설득하는가? (문제제기→해결, 비교→우위, 후기→신뢰 등)
+- 핵심 소구점(appeal point)이 동일한가?
+- 예: 구조는 다르지만 둘 다 "사용 후기로 신뢰감 형성" → 설득 기조 유사(80%+)
+
+### 최종 유사도 계산
+- 구조 유사도 70% 이상 → 최종 유사도 = 구조 유사도 (구조가 같으면 확정적으로 유사)
+- 구조 유사도 70% 미만 → 최종 유사도 = 설득 기조 유사도 × 0.8 (구조가 다르면 설득 기조로 판단, 가중치 적용)
 
 ## 코드 작성 규칙
 - code는 알파벳 대문자 + 숫자 조합 (예: A1, B3, C2)
@@ -45,14 +65,16 @@ ANALYZE_PROMPT = """
     {{
       "code": "기존유형코드",
       "name": "기존유형명",
+      "structure_similarity": 85,
+      "persuasion_similarity": 90,
       "similarity_percent": 85,
-      "reason": "유사한 이유"
+      "reason": "1차(구조): [구조 유사 이유] / 2차(설득기조): [설득 유사 이유]"
     }}
   ]
 }}
 ```
 
-유사도 80% 이상인 유형만 similar_types에 포함하세요.
+최종 유사도(similarity_percent) 80% 이상인 유형만 similar_types에 포함하세요.
 유사한 유형이 없으면 similar_types를 빈 배열로 두세요.
 """
 
@@ -70,7 +92,7 @@ def analyze_and_check(script_text: str, existing_types: list[dict]) -> dict:
   이름: {t.get("name", "")}
   핵심 콘셉트: {t.get("core_concept", "")}
   설명: {t.get("description", "")}
-  예시 원고: {(t.get("example_copy", "") or "")[:200]}
+  예시 원고: {(t.get("example_copy", "") or "")[:500]}
 """
 
     if not existing_types:
@@ -86,7 +108,7 @@ def analyze_and_check(script_text: str, existing_types: list[dict]) -> dict:
     client = genai.Client(api_key=api_key)
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=prompt,
     )
 

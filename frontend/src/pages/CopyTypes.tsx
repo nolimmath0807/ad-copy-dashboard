@@ -53,7 +53,7 @@ export function CopyTypes() {
   const [similarityDialogOpen, setSimilarityDialogOpen] = useState(false);
   const [similarityResult, setSimilarityResult] = useState<{
     is_similar: boolean;
-    similar_types: Array<{ id: string; code: string; name: string; similarity_percent: number; reason: string }>;
+    similar_types: Array<{ id: string; code: string; name: string; structure_similarity: number; persuasion_similarity: number; similarity_percent: number; reason: string }>;
   } | null>(null);
   const [pendingCreateData, setPendingCreateData] = useState<CopyTypeCreate | null>(null);
 
@@ -353,18 +353,87 @@ export function CopyTypes() {
               <p><span className="font-medium">핵심 콘셉트:</span> {pendingCreateData.core_concept}</p>
             </div>
           )}
-          <div className="space-y-3 py-2">
-            {similarityResult?.similar_types.map((item, idx) => (
-              <div key={idx} className="rounded-lg border p-3 space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">{item.code} - {item.name}</span>
-                  <Badge variant={item.similarity_percent >= 90 ? "destructive" : "secondary"}>
-                    {item.similarity_percent}% 유사
-                  </Badge>
+          <div className="space-y-4 py-2">
+            {similarityResult?.similar_types.map((item, idx) => {
+              const structureReason = item.reason.includes('1차(구조):')
+                ? item.reason.split('1차(구조):')[1]?.split('/')[0]?.trim() || ''
+                : '';
+              const persuasionReason = item.reason.includes('2차(설득기조):')
+                ? item.reason.split('2차(설득기조):')[1]?.trim() || ''
+                : '';
+              const isStructureDriven = (item.structure_similarity || 0) >= 70;
+
+              return (
+                <div key={idx} className="rounded-xl border-2 border-amber-200 bg-amber-50/50 p-4 space-y-3">
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <span className="font-bold text-base text-gray-900">{item.code} - {item.name}</span>
+                    <span
+                      className={`inline-flex items-center rounded-md font-bold text-sm px-3 py-1 border ${
+                        item.similarity_percent >= 90
+                          ? 'bg-red-600 text-white border-red-700'
+                          : 'bg-amber-500 text-white border-amber-600'
+                      }`}
+                    >
+                      최종 {item.similarity_percent}%
+                    </span>
+                  </div>
+
+                  {/* 2-stage breakdown bars */}
+                  <div className="space-y-2">
+                    {/* Stage 1: Structure */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className={`font-bold ${isStructureDriven ? 'text-red-700' : 'text-gray-500'}`}>
+                          1차 구조 유사도 {isStructureDriven && '← 판단 기준'}
+                        </span>
+                        <span className="font-mono font-bold text-gray-900">{item.structure_similarity || 0}%</span>
+                      </div>
+                      <div className="h-2.5 rounded-full bg-gray-200 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            (item.structure_similarity || 0) >= 70 ? 'bg-red-400' : 'bg-gray-400'
+                          }`}
+                          style={{ width: `${item.structure_similarity || 0}%` }}
+                        />
+                      </div>
+                      {structureReason && (
+                        <p className="text-xs text-gray-600 pl-1">{structureReason}</p>
+                      )}
+                    </div>
+
+                    {/* Stage 2: Persuasion */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className={`font-bold ${!isStructureDriven ? 'text-amber-700' : 'text-gray-500'}`}>
+                          2차 설득기조 유사도 {!isStructureDriven && '← 판단 기준'}
+                        </span>
+                        <span className="font-mono font-bold text-gray-900">{item.persuasion_similarity || 0}%</span>
+                      </div>
+                      <div className="h-2.5 rounded-full bg-gray-200 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all ${
+                            (item.persuasion_similarity || 0) >= 80 ? 'bg-amber-400' : 'bg-gray-400'
+                          }`}
+                          style={{ width: `${item.persuasion_similarity || 0}%` }}
+                        />
+                      </div>
+                      {persuasionReason && (
+                        <p className="text-xs text-gray-600 pl-1">{persuasionReason}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Formula explanation */}
+                  <div className="text-xs text-gray-700 font-medium bg-white rounded-lg px-3 py-2 border border-amber-200">
+                    {isStructureDriven
+                      ? `구조 유사도(${item.structure_similarity}%) ≥ 70% → 구조 기준으로 최종 ${item.similarity_percent}% 판정`
+                      : `구조 유사도(${item.structure_similarity || 0}%) < 70% → 설득기조(${item.persuasion_similarity}%) × 0.8 = 최종 ${item.similarity_percent}% 판정`
+                    }
+                  </div>
                 </div>
-                <p className="text-sm text-muted-foreground">{item.reason}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setSimilarityDialogOpen(false)} className="border-gray-300">

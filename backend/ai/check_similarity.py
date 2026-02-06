@@ -13,7 +13,7 @@ load_dotenv()
 SIMILARITY_CHECK_PROMPT = """
 당신은 광고 원고 유형 분석 전문가입니다.
 
-새로운 원고 유형이 기존 원고 유형들과 얼마나 유사한지 분석해주세요.
+새로운 원고 유형이 기존 원고 유형들과 얼마나 유사한지 **2단계 분석**을 수행하세요.
 
 ## 새로운 원고 유형
 - 핵심 콘셉트: {new_core_concept}
@@ -23,14 +23,27 @@ SIMILARITY_CHECK_PROMPT = """
 ## 기존 원고 유형 목록
 {existing_types_text}
 
-## 분석 기준
-1. 핵심 콘셉트의 유사성 (의도, 목적, 접근 방식)
-2. 설명의 유사성 (설명하는 방식, 특징)
-3. 예시 원고의 유사성 (어조, 구조, 표현 방식)
+## 2단계 유사도 검사 기준
+
+### 1단계: 구조 유사도 (structure_similarity)
+원고의 **전체 구조/뼈대**가 동일한지 판단합니다.
+- 문장 배치 순서, 단락 구성, 흐름 패턴이 같은가?
+- 상품명/브랜드명/키워드만 바꾸고 나머지 틀은 그대로인 베리에이션인가?
+- 구조가 완전히 다르면 낮은 점수 (30% 이하)
+
+### 2단계: 설득 기조 유사도 (persuasion_similarity)
+원고 구조가 다르더라도 **무엇으로 설득하는지**가 같은지 판단합니다.
+- 소비자의 어떤 심리/니즈를 자극하는가?
+- 어떤 논리 구조로 설득하는가?
+- 핵심 소구점(appeal point)이 동일한가?
+
+### 최종 유사도 계산
+- 구조 유사도 70% 이상 → 최종 유사도 = 구조 유사도
+- 구조 유사도 70% 미만 → 최종 유사도 = 설득 기조 유사도 × 0.8
 
 ## 응답 형식
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트는 포함하지 마세요.
-유사도가 80% 이상인 유형만 포함하세요.
+최종 유사도(similarity_percent) 80% 이상인 유형만 포함하세요.
 
 ```json
 {{
@@ -38,19 +51,16 @@ SIMILARITY_CHECK_PROMPT = """
     {{
       "code": "유형코드",
       "name": "유형명",
+      "structure_similarity": 85,
+      "persuasion_similarity": 90,
       "similarity_percent": 85,
-      "reason": "유사한 이유 설명"
+      "reason": "1차(구조): [이유] / 2차(설득기조): [이유]"
     }}
   ]
 }}
 ```
 
-유사도가 80% 이상인 유형이 없으면:
-```json
-{{
-  "similar_types": []
-}}
-```
+유사한 유형이 없으면 similar_types를 빈 배열로 두세요.
 """
 
 
@@ -79,7 +89,7 @@ def check_copy_type_similarity(new_data: dict, existing_types: list[dict]) -> di
     client = genai.Client(api_key=api_key)
 
     response = client.models.generate_content(
-        model="gemini-2.0-flash",
+        model="gemini-2.5-flash",
         contents=prompt,
     )
 
