@@ -74,7 +74,7 @@ export const copyTypesApi = {
     fetchAPI<{
       extracted: { code: string; name: string; core_concept: string; description: string } | null;
       is_similar: boolean;
-      similar_types: Array<{ code: string; name: string; similarity_percent: number; reason: string }>;
+      similar_types: Array<{ id: string; code: string; name: string; similarity_percent: number; reason: string }>;
     }>('/api/copy-types/auto-analyze', {
       method: 'POST',
       body: JSON.stringify({ script_text: scriptText }),
