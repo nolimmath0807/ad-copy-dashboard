@@ -46,7 +46,12 @@ export function CopyGenerator() {
   // 부모 유형 변경 시 자식 선택 초기화
   function handleParentTypeChange(parentId: string) {
     setSelectedParentType(parentId);
-    setSelectedVariant('');
+    const children = copyTypes.filter(ct => ct.parent_id === parentId);
+    if (children.length === 0) {
+      setSelectedVariant(parentId);
+    } else {
+      setSelectedVariant('');
+    }
   }
 
   async function handleGenerate() {
@@ -145,6 +150,12 @@ export function CopyGenerator() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+              )}
+
+              {selectedParentType && childVariants.length === 0 && (
+                <div className="text-sm p-3 bg-amber-50 border border-amber-200 rounded-md text-amber-700">
+                  이 유형은 세부 스타일 없이 바로 생성됩니다.
                 </div>
               )}
 
