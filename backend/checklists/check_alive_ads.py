@@ -58,7 +58,7 @@ def check_alive_ads(utm_codes: list[str], week: str = None) -> dict:
         utm_data = spend_by_utm.get(utm, {})
         sunday_spend = utm_data.get(sunday_str, 0)
         monday_spend = utm_data.get(monday_str, 0)
-        alive = sunday_spend > 0 and monday_spend > 0
+        alive = sunday_spend > 0 or monday_spend > 0
         total_spend = sunday_spend + monday_spend
 
         # last_spend_date: latest date with spend > 0
