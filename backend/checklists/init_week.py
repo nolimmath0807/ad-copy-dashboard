@@ -74,14 +74,16 @@ def init_week_checklists(week: str = None):
                     "copy_type_id": copy_type["id"],
                     "team_id": tp["team_id"],
                     "status": "pending",
-                    "week": week
+                    "week": week,
+                    "utm_code": None,
+                    "notes": None
                 }
-                # Auto-carry: 이전 주차의 모든 UTM 코드가 alive이면 자동 이월
+                # Auto-carry: 이전 주차의 UTM 코드 중 alive인 것만 이월
                 if triple in prev_by_triple:
                     prev = prev_by_triple[triple]
-                    all_alive = all(alive_results.get(c, {}).get("alive", False) for c in prev["codes"])
-                    if all_alive:
-                        entry["utm_code"] = prev["utm_code"]
+                    alive_codes = [c for c in prev["codes"] if alive_results.get(c, {}).get("alive", False)]
+                    if alive_codes:
+                        entry["utm_code"] = json.dumps(alive_codes)
                         entry["status"] = "completed"
                         entry["notes"] = "auto-carry"
                 new_checklists.append(entry)
