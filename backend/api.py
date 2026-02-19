@@ -9,6 +9,8 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from typing import Optional
 import uvicorn
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 # Audit
 from audit.log import write_audit_log
@@ -42,6 +44,7 @@ from checklists.update_checklist import update_checklist
 from checklists.init_week import init_week_checklists
 from checklists.list_with_utm import list_checklists_with_utm
 from checklists.check_alive_ads import check_alive_ads
+from checklists.daily_alive_check import daily_alive_check
 
 # Best Copies
 from best_copies.list_best import list_best_copies
@@ -99,6 +102,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Daily alive check scheduler
+scheduler = BackgroundScheduler()
+scheduler.add_job(
+    daily_alive_check,
+    CronTrigger(hour=0, minute=0, timezone="Asia/Seoul"),
+    id="daily_alive_check",
+    name="Daily UTM alive check",
+    replace_existing=True
+)
+scheduler.start()
 
 
 def get_user_id_from_request(authorization: str = None) -> str | None:
@@ -439,6 +453,13 @@ def api_check_alive_ads(utm_codes: str):
     if not codes:
         return {}
     return check_alive_ads(codes)
+
+
+@app.post("/api/checklists/daily-check")
+def api_daily_alive_check():
+    """수동으로 daily alive check 실행"""
+    result = daily_alive_check()
+    return result
 
 
 @app.put("/api/checklists/{id}")
