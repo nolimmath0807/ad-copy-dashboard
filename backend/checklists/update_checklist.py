@@ -1,5 +1,7 @@
 import argparse
 import sys
+from datetime import datetime, timezone
+
 sys.path.insert(0, "/Users/las/Development/project/ad-copy-dashboard/backend")
 
 from conn import get_supabase_client
@@ -7,7 +9,7 @@ from conn import get_supabase_client
 
 def update_checklist(checklist_id: str, data: dict):
     client = get_supabase_client()
-    data["updated_at"] = "now()"
+    data["updated_at"] = datetime.now(timezone.utc).isoformat()
     response = client.table("checklists").update(data).eq("id", checklist_id).execute()
     return response.data[0]
 

@@ -41,21 +41,37 @@ function getCurrentMonth(): string {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }
 
-// 현재 주차 계산 함수
+// 현재 주차 계산 함수 (ISO 8601 - Python의 %G-W%V와 동일)
 function getCurrentWeek(): string {
   const now = new Date();
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const days = Math.floor((now.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
-  const weekNumber = Math.ceil((days + startOfYear.getDay() + 1) / 7);
-  return `${now.getFullYear()}-W${weekNumber.toString().padStart(2, '0')}`;
+  // ISO 8601: Week 1 contains the first Thursday of the year
+  // Copy the date to avoid mutations
+  const d = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()));
+  // Set to nearest Thursday (current date + 4 - current day number, with Sunday=7)
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  // Get first day of year
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  // Calculate full weeks between yearStart and nearest Thursday
+  const weekNumber = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  // ISO year may differ from calendar year at year boundaries
+  return `${d.getUTCFullYear()}-W${weekNumber.toString().padStart(2, '0')}`;
 }
 
-// 이전 주차 계산
+// 이전 주차 계산 (ISO 8601 연도 경계 처리)
 function getPreviousWeek(week: string): string {
   const [year, w] = week.split('-W');
   const weekNum = parseInt(w);
   if (weekNum === 1) {
-    return `${parseInt(year) - 1}-W52`;
+    // ISO: previous year's last week could be 52 or 53
+    // Dec 28 is always in the last ISO week of the year
+    const dec28 = new Date(parseInt(year) - 1, 11, 28);
+    const d = new Date(Date.UTC(dec28.getFullYear(), dec28.getMonth(), dec28.getDate()));
+    const dayNum = d.getUTCDay() || 7;
+    d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+    const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+    const lastWeek = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return `${parseInt(year) - 1}-W${lastWeek.toString().padStart(2, '0')}`;
   }
   return `${year}-W${(weekNum - 1).toString().padStart(2, '0')}`;
 }
