@@ -58,6 +58,23 @@ def query_yesterday_spend(utm_codes: list[str], yesterday_str: str) -> dict[str,
     return spend_map
 
 
+def query_ever_spent(utm_codes: list[str]) -> set[str]:
+    """해당 UTM 코드들 중 과거 광고비 소진 이력이 있는 것만 반환"""
+    conn = get_connection()
+    cur = conn.cursor()
+    placeholders = ",".join(["%s"] * len(utm_codes))
+    sql = f"""
+        SELECT DISTINCT regexp_replace(ad_code, '^\\[[^]]*\\]', '') AS utm_code
+        FROM ad_performance.meta_daily_perform
+        WHERE regexp_replace(ad_code, '^\\[[^]]*\\]', '') IN ({placeholders})
+          AND spend > 0
+    """
+    cur.execute(sql, utm_codes)
+    result = {row[0] for row in cur.fetchall()}
+    cur.close()
+    return result
+
+
 def daily_alive_check() -> dict:
     kst = ZoneInfo("Asia/Seoul")
     now_kst = datetime.now(kst)
@@ -128,21 +145,34 @@ def daily_alive_check() -> dict:
     details = []
 
     # Step 1: Remove dead UTMs from current week checklists
-    skipped_count = 0
+    # First pass: collect all dead codes across all checklists
+    all_dead_codes = set()
+    checklist_code_map = []  # [(checklist, alive_codes, dead_codes), ...]
     for c in current_with_utm:
-        # Skip user-registered items (only check auto-carried items)
-        if c.get("notes") != "auto-carry":
-            skipped_count += 1
-            print(f"  [skip] Checklist {c['id']}: notes={c.get('notes')!r} (user-registered, not auto-carry)")
-            continue
-
         codes = parse_utm_codes(c.get("utm_code"))
         alive_codes = [code for code in codes if code in alive_utms]
         dead_codes = [code for code in codes if code not in alive_utms]
-
         if dead_codes:
-            removed_count += len(dead_codes)
-            new_utm = json.dumps(alive_codes) if alive_codes else None
+            checklist_code_map.append((c, alive_codes, dead_codes))
+            all_dead_codes.update(dead_codes)
+
+    # Check historical spend for all dead codes at once
+    ever_spent = query_ever_spent(list(all_dead_codes)) if all_dead_codes else set()
+    preserved_count = 0
+
+    # Second pass: only remove truly dead codes (had spend before)
+    for c, alive_codes, dead_codes in checklist_code_map:
+        truly_dead = [code for code in dead_codes if code in ever_spent]
+        new_codes = [code for code in dead_codes if code not in ever_spent]  # 신규 등록, 보호
+
+        if new_codes:
+            preserved_count += len(new_codes)
+            print(f"  [preserve] Checklist {c['id']}: new UTMs preserved {new_codes} (no historical spend)")
+
+        if truly_dead:
+            remaining = alive_codes + new_codes  # alive + 신규는 유지
+            removed_count += len(truly_dead)
+            new_utm = json.dumps(remaining) if remaining else None
             data = {
                 "utm_code": new_utm,
                 "updated_at": datetime.now(timezone.utc).isoformat(),
@@ -152,11 +182,12 @@ def daily_alive_check() -> dict:
             detail = {
                 "checklist_id": c["id"],
                 "action": "remove_dead",
-                "removed": dead_codes,
-                "remaining": alive_codes,
+                "removed": truly_dead,
+                "preserved_new": new_codes,
+                "remaining": remaining,
             }
             details.append(detail)
-            print(f"  [remove] Checklist {c['id']}: removed {dead_codes}, remaining {alive_codes}")
+            print(f"  [remove] Checklist {c['id']}: removed {truly_dead}, preserved_new {new_codes}, remaining {remaining}")
 
     # Step 2: Re-activate alive UTMs from previous week
     # Rebuild current_utm_set after removals
@@ -217,11 +248,11 @@ def daily_alive_check() -> dict:
         "dead": len(dead_utms),
         "removed": removed_count,
         "reactivated": reactivated_count,
-        "skipped_user_registered": skipped_count,
+        "preserved_new": preserved_count,
         "details": details,
     }
 
-    print(f"[daily_alive_check] Summary: checked={len(all_utm_codes)}, removed={removed_count}, reactivated={reactivated_count}, skipped_user_registered={skipped_count}")
+    print(f"[daily_alive_check] Summary: checked={len(all_utm_codes)}, removed={removed_count}, reactivated={reactivated_count}, preserved_new={preserved_count}")
     return summary
 
 
