@@ -128,7 +128,14 @@ def daily_alive_check() -> dict:
     details = []
 
     # Step 1: Remove dead UTMs from current week checklists
+    skipped_count = 0
     for c in current_with_utm:
+        # Skip user-registered items (only check auto-carried items)
+        if c.get("notes") != "auto-carry":
+            skipped_count += 1
+            print(f"  [skip] Checklist {c['id']}: notes={c.get('notes')!r} (user-registered, not auto-carry)")
+            continue
+
         codes = parse_utm_codes(c.get("utm_code"))
         alive_codes = [code for code in codes if code in alive_utms]
         dead_codes = [code for code in codes if code not in alive_utms]
@@ -210,10 +217,11 @@ def daily_alive_check() -> dict:
         "dead": len(dead_utms),
         "removed": removed_count,
         "reactivated": reactivated_count,
+        "skipped_user_registered": skipped_count,
         "details": details,
     }
 
-    print(f"[daily_alive_check] Summary: checked={len(all_utm_codes)}, removed={removed_count}, reactivated={reactivated_count}")
+    print(f"[daily_alive_check] Summary: checked={len(all_utm_codes)}, removed={removed_count}, reactivated={reactivated_count}, skipped_user_registered={skipped_count}")
     return summary
 
 
