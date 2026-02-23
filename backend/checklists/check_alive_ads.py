@@ -17,15 +17,13 @@ def check_alive_ads(utm_codes: list[str], week: str = None) -> dict:
         now = datetime.now()
         monday = now - timedelta(days=now.weekday())
 
-    # 직전 7일 체크 (monday 포함, 7일 전부터)
-    end_date = monday
-    start_date = monday - timedelta(days=7)
-    start_date_str = start_date.strftime("%Y-%m-%d")
-    end_date_str = end_date.strftime("%Y-%m-%d")
+    sunday = monday - timedelta(days=1)
+    sunday_str = sunday.strftime("%Y-%m-%d")
+    monday_str = monday.strftime("%Y-%m-%d")
 
     placeholders = ",".join(["%s"] * len(utm_codes))
 
-    # Query spend for the past 7 days per utm_code
+    # Query spend for Sunday and Monday separately per utm_code
     sql = f"""
         SELECT
             regexp_replace(ad_code, '^\\[[^]]*\\]', '') AS utm_code,
@@ -33,11 +31,11 @@ def check_alive_ads(utm_codes: list[str], week: str = None) -> dict:
             COALESCE(SUM(spend), 0) AS daily_spend
         FROM ad_performance.meta_daily_perform
         WHERE regexp_replace(ad_code, '^\\[[^]]*\\]', '') IN ({placeholders})
-          AND date BETWEEN %s AND %s
+          AND date IN (%s, %s)
         GROUP BY regexp_replace(ad_code, '^\\[[^]]*\\]', ''), date
     """
 
-    params = utm_codes + [start_date_str, end_date_str]
+    params = utm_codes + [sunday_str, monday_str]
     cur.execute(sql, params)
 
     columns = [desc[0] for desc in cur.description]
@@ -58,15 +56,16 @@ def check_alive_ads(utm_codes: list[str], week: str = None) -> dict:
     result = {}
     for utm in utm_codes:
         utm_data = spend_by_utm.get(utm, {})
-        total_spend = sum(utm_data.values())
-        alive = total_spend > 0
+        sunday_spend = utm_data.get(sunday_str, 0)
+        monday_spend = utm_data.get(monday_str, 0)
+        alive = sunday_spend > 0 or monday_spend > 0
+        total_spend = sunday_spend + monday_spend
 
-        # last_spend_date: 7일 중 가장 최근 소진일
         last_spend_date = None
-        for date_str in sorted(utm_data.keys(), reverse=True):
-            if utm_data[date_str] > 0:
-                last_spend_date = date_str
-                break
+        if monday_spend > 0:
+            last_spend_date = monday_str
+        elif sunday_spend > 0:
+            last_spend_date = sunday_str
 
         result[utm] = {
             "alive": alive,

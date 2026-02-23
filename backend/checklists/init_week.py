@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 sys.path.insert(0, sys.path[0] + "/..")
 
 from conn import get_supabase_client
-from checklists.check_alive_ads import check_alive_ads
 
 
 def get_current_week() -> str:
@@ -47,9 +46,8 @@ def init_week_checklists(week: str = None):
     )
     prev_checklists = [item for item in prev_checklists if item.get("utm_code")]
 
-    # 이전 주차의 UTM 코드 수집 및 alive 체크
+    # 이전 주차의 UTM 코드 수집
     prev_by_triple = {}
-    all_utm_codes = set()
     for item in prev_checklists:
         utm_code_raw = item["utm_code"]
         codes = json.loads(utm_code_raw) if isinstance(utm_code_raw, str) else utm_code_raw
@@ -57,11 +55,6 @@ def init_week_checklists(week: str = None):
             codes = [codes]
         triple = (item["product_id"], item["copy_type_id"], item["team_id"])
         prev_by_triple[triple] = {"utm_code": utm_code_raw, "codes": codes}
-        all_utm_codes.update(codes)
-
-    alive_results = {}
-    if all_utm_codes:
-        alive_results = check_alive_ads(list(all_utm_codes), week)
 
     # 누락된 조합만 생성
     new_checklists = []
@@ -78,12 +71,11 @@ def init_week_checklists(week: str = None):
                     "utm_code": None,
                     "notes": None
                 }
-                # Auto-carry: 이전 주차의 UTM 코드 중 alive인 것만 이월
+                # Auto-carry: 이전 주차의 UTM 코드 전부 이월
                 if triple in prev_by_triple:
                     prev = prev_by_triple[triple]
-                    alive_codes = [c for c in prev["codes"] if alive_results.get(c, {}).get("alive", False)]
-                    if alive_codes:
-                        entry["utm_code"] = json.dumps(alive_codes)
+                    if prev["codes"]:
+                        entry["utm_code"] = json.dumps(prev["codes"])
                         entry["status"] = "completed"
                         entry["notes"] = "auto-carry"
                 new_checklists.append(entry)
