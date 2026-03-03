@@ -3,33 +3,74 @@ PostgreSQL 데이터베이스 클라이언트
 Supabase 클라이언트 인터페이스와 호환되는 래퍼
 """
 import os
+import threading
 import psycopg2
 import psycopg2.extras
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# 연결 풀
-_connection = None
+# 스레드별 커넥션 격리
+_thread_local = threading.local()
+
+
+def _create_connection():
+    """새 DB 커넥션 생성 + 스키마 설정"""
+    conn = psycopg2.connect(
+        host=os.environ["DB_HOST"],
+        port=os.environ["DB_PORT"],
+        database=os.environ["DB_NAME"],
+        user=os.environ["DB_USER"],
+        password=os.environ["DB_PASSWORD"]
+    )
+    conn.autocommit = True
+    # 스키마 설정
+    cur = conn.cursor()
+    schema = os.environ.get("DB_SCHEMA", "public")
+    cur.execute(f'SET search_path TO "{schema}";')
+    cur.close()
+    return conn
+
+
+def _is_connection_alive(conn):
+    """커넥션 health check (SELECT 1)"""
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        cur.close()
+        return True
+    except (psycopg2.DatabaseError, psycopg2.OperationalError):
+        return False
 
 
 def get_connection():
-    global _connection
-    if _connection is None or _connection.closed:
-        _connection = psycopg2.connect(
-            host=os.environ["DB_HOST"],
-            port=os.environ["DB_PORT"],
-            database=os.environ["DB_NAME"],
-            user=os.environ["DB_USER"],
-            password=os.environ["DB_PASSWORD"]
-        )
-        _connection.autocommit = True
-        # 스키마 설정
-        cur = _connection.cursor()
-        schema = os.environ.get("DB_SCHEMA", "public")
-        cur.execute(f'SET search_path TO "{schema}";')
-        cur.close()
-    return _connection
+    conn = getattr(_thread_local, "connection", None)
+    if conn is None or conn.closed:
+        conn = _create_connection()
+        _thread_local.connection = conn
+        return conn
+    # 기존 커넥션이 살아있는지 확인
+    if not _is_connection_alive(conn):
+        try:
+            conn.close()
+        except Exception:
+            pass
+        conn = _create_connection()
+        _thread_local.connection = conn
+    return conn
+
+
+def _reset_connection():
+    """현재 스레드의 커넥션을 강제 재생성"""
+    old_conn = getattr(_thread_local, "connection", None)
+    if old_conn is not None:
+        try:
+            old_conn.close()
+        except Exception:
+            pass
+    conn = _create_connection()
+    _thread_local.connection = conn
+    return conn
 
 
 def serialize_row(row):
@@ -139,6 +180,9 @@ class QueryBuilder:
         return self
 
     def execute(self):
+        return self._execute_with_retry()
+
+    def _execute_with_retry(self, _retried=False):
         conn = get_connection()
         cur = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
 
@@ -273,7 +317,16 @@ class QueryBuilder:
                 rows = cur.fetchall()
                 return QueryResult([dict(row) for row in rows])
 
-        finally:
+        except (psycopg2.DatabaseError, psycopg2.OperationalError):
+            try:
+                cur.close()
+            except Exception:
+                pass
+            if not _retried:
+                _reset_connection()
+                return self._execute_with_retry(_retried=True)
+            raise
+        else:
             cur.close()
 
 
