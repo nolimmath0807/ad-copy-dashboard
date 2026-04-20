@@ -22,7 +22,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { productsApi, sellingPointsApi, assetsApi, pricingApi } from '@/lib/api-client';
 import { toast } from 'sonner';
@@ -889,9 +889,9 @@ function ProductDetailSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-2xl overflow-y-auto">
-        <div className="px-6 pt-6 pb-2 border-b">
-          <h2 className="text-lg font-bold pr-8">{product.name}</h2>
-        </div>
+        <SheetHeader className="px-6 pt-6 pb-2 border-b">
+          <SheetTitle className="text-lg font-bold pr-8">{product.name}</SheetTitle>
+        </SheetHeader>
         {loadingDetail ? (
           <div className="space-y-3 mt-6">
             <Skeleton className="h-10 w-full" />
