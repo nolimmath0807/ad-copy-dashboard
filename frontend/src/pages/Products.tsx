@@ -899,7 +899,7 @@ function ProductDetailSheet({
             <Skeleton className="h-32 w-full" />
           </div>
         ) : (
-          <Tabs defaultValue="basic" className="mt-4">
+          <Tabs defaultValue="basic" className="mt-4 px-6">
             <TabsList className="w-full grid grid-cols-4">
               <TabsTrigger value="basic">기본정보</TabsTrigger>
               <TabsTrigger value="selling-points">소구점</TabsTrigger>
