@@ -9,6 +9,10 @@ export interface Product {
   shape: string | null;
   herb_keywords: string[] | null;
   default_utm_code: string | null;
+  slug?: string;
+  form?: string;
+  dosage?: string;
+  cta_channel?: string;
   created_at: string;
   updated_at: string;
 }
@@ -23,6 +27,10 @@ export interface ProductCreate {
   shape?: string;
   herb_keywords?: string[];
   default_utm_code?: string;
+  slug?: string;
+  form?: string;
+  dosage?: string;
+  cta_channel?: string;
 }
 
 export interface ProductUpdate extends Partial<ProductCreate> {}
@@ -232,4 +240,81 @@ export interface AuditLog {
   record_id: string | null;
   changes: Record<string, unknown> | null;
   created_at: string;
+}
+
+// Reference Scripts
+export interface ReferenceScript {
+  script_id: string;
+  advertiser_name: string;
+  script_text: string;
+  hook_type: string | null;
+  hook_first_line: string | null;
+  cta_type: string | null;
+  selling_point: string | null;
+  script_type: string | null;
+  line_count: number | null;
+  char_count: number | null;
+}
+
+export interface ReferenceFilters {
+  hook_types: string[];
+  selling_points: string[];
+  script_types: string[];
+  advertisers: string[];
+}
+
+export interface ProductSellingPoint {
+  id: string;
+  product_id: string;
+  label: string;
+  headline?: string;
+  mechanism?: string;
+  key_ingredients?: string;
+  target_symptoms?: string[];
+  competitor_alt?: string;
+  is_active: boolean;
+}
+
+export interface ProductSellingPointCreate {
+  label: string;
+  headline?: string;
+  mechanism?: string;
+  key_ingredients?: string;
+  target_symptoms?: string[];
+  competitor_alt?: string;
+  is_active?: boolean;
+}
+
+export interface ProductAsset {
+  id: string;
+  product_id: string;
+  asset_key: string;
+  asset_value: string;
+  asset_label?: string;
+}
+
+export interface ProductAssetCreate {
+  asset_key: string;
+  asset_value: string;
+  asset_label?: string;
+}
+
+export interface ProductPricing {
+  id: string;
+  product_id: string;
+  option_name: string;
+  price?: number;
+  original_price?: number;
+  discount_rate?: number;
+  daily_price?: number;
+  is_main: boolean;
+}
+
+export interface ProductPricingCreate {
+  option_name: string;
+  price?: number;
+  original_price?: number;
+  discount_rate?: number;
+  daily_price?: number;
+  is_main?: boolean;
 }

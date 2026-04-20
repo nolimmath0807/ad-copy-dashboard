@@ -22,6 +22,9 @@ from products.get_product import get_product
 from products.create_product import create_product
 from products.update_product import update_product
 from products.delete_product import delete_product
+from products.selling_points import list_selling_points, create_selling_point, update_selling_point, delete_selling_point
+from products.assets import list_assets, create_asset, update_asset, delete_asset
+from products.pricing import list_pricing, create_pricing, update_pricing, delete_pricing
 
 # Copy Types
 from copy_types.list_copy_types import list_copy_types
@@ -78,6 +81,9 @@ from team_products.update_team_product import update_team_product
 # User Preferences
 from user_preferences.get_preferences import get_preferences
 from user_preferences.update_preferences import update_preferences
+
+# References
+from references.list_references import list_references, get_reference_filters
 
 # Auth
 from auth.register import register_user
@@ -140,6 +146,10 @@ class ProductCreate(BaseModel):
     shape: Optional[str] = None
     herb_keywords: Optional[list[str]] = None
     default_utm_code: Optional[str] = None
+    slug: Optional[str] = None
+    form: Optional[str] = None
+    dosage: Optional[str] = None
+    cta_channel: Optional[str] = None
 
 
 class ProductUpdate(BaseModel):
@@ -152,6 +162,55 @@ class ProductUpdate(BaseModel):
     shape: Optional[str] = None
     herb_keywords: Optional[list[str]] = None
     default_utm_code: Optional[str] = None
+    slug: Optional[str] = None
+    form: Optional[str] = None
+    dosage: Optional[str] = None
+    cta_channel: Optional[str] = None
+
+
+class SellingPointCreate(BaseModel):
+    label: str
+    headline: Optional[str] = None
+    mechanism: Optional[str] = None
+    key_ingredients: Optional[str] = None
+    target_symptoms: Optional[list[str]] = None
+    competitor_alt: Optional[str] = None
+    is_active: bool = True
+
+class SellingPointUpdate(BaseModel):
+    label: Optional[str] = None
+    headline: Optional[str] = None
+    mechanism: Optional[str] = None
+    key_ingredients: Optional[str] = None
+    target_symptoms: Optional[list[str]] = None
+    competitor_alt: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class ProductAssetCreate(BaseModel):
+    asset_key: str
+    asset_value: str
+    asset_label: Optional[str] = None
+
+class ProductAssetUpdate(BaseModel):
+    asset_key: Optional[str] = None
+    asset_value: Optional[str] = None
+    asset_label: Optional[str] = None
+
+class ProductPricingCreate(BaseModel):
+    option_name: str
+    price: Optional[int] = None
+    original_price: Optional[int] = None
+    discount_rate: Optional[int] = None
+    daily_price: Optional[int] = None
+    is_main: bool = False
+
+class ProductPricingUpdate(BaseModel):
+    option_name: Optional[str] = None
+    price: Optional[int] = None
+    original_price: Optional[int] = None
+    discount_rate: Optional[int] = None
+    daily_price: Optional[int] = None
+    is_main: Optional[bool] = None
 
 
 # Copy Type Models
@@ -318,6 +377,72 @@ def api_update_product(id: str, data: ProductUpdate, authorization: str = Header
 def api_delete_product(id: str, authorization: str = Header(None)):
     delete_product(id)
     write_audit_log(get_user_id_from_request(authorization), "delete", "products", id, None)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ============================================
+# Product Selling Points API
+# ============================================
+
+@app.get("/api/products/{product_id}/selling-points")
+def api_list_selling_points(product_id: str):
+    return list_selling_points(product_id)
+
+@app.post("/api/products/{product_id}/selling-points", status_code=status.HTTP_201_CREATED)
+def api_create_selling_point(product_id: str, data: SellingPointCreate):
+    return create_selling_point(product_id, data.model_dump(exclude_none=True))
+
+@app.put("/api/products/{product_id}/selling-points/{sp_id}")
+def api_update_selling_point(product_id: str, sp_id: str, data: SellingPointUpdate):
+    return update_selling_point(sp_id, data.model_dump(exclude_none=True))
+
+@app.delete("/api/products/{product_id}/selling-points/{sp_id}", status_code=status.HTTP_204_NO_CONTENT)
+def api_delete_selling_point(product_id: str, sp_id: str):
+    delete_selling_point(sp_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ============================================
+# Product Assets API
+# ============================================
+
+@app.get("/api/products/{product_id}/assets")
+def api_list_assets(product_id: str):
+    return list_assets(product_id)
+
+@app.post("/api/products/{product_id}/assets", status_code=status.HTTP_201_CREATED)
+def api_create_asset(product_id: str, data: ProductAssetCreate):
+    return create_asset(product_id, data.model_dump(exclude_none=True))
+
+@app.put("/api/products/{product_id}/assets/{asset_id}")
+def api_update_asset(product_id: str, asset_id: str, data: ProductAssetUpdate):
+    return update_asset(asset_id, data.model_dump(exclude_none=True))
+
+@app.delete("/api/products/{product_id}/assets/{asset_id}", status_code=status.HTTP_204_NO_CONTENT)
+def api_delete_asset(product_id: str, asset_id: str):
+    delete_asset(asset_id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+# ============================================
+# Product Pricing API
+# ============================================
+
+@app.get("/api/products/{product_id}/pricing")
+def api_list_pricing(product_id: str):
+    return list_pricing(product_id)
+
+@app.post("/api/products/{product_id}/pricing", status_code=status.HTTP_201_CREATED)
+def api_create_pricing(product_id: str, data: ProductPricingCreate):
+    return create_pricing(product_id, data.model_dump(exclude_none=True))
+
+@app.put("/api/products/{product_id}/pricing/{pricing_id}")
+def api_update_pricing(product_id: str, pricing_id: str, data: ProductPricingUpdate):
+    return update_pricing(pricing_id, data.model_dump(exclude_none=True))
+
+@app.delete("/api/products/{product_id}/pricing/{pricing_id}", status_code=status.HTTP_204_NO_CONTENT)
+def api_delete_pricing(product_id: str, pricing_id: str):
+    delete_pricing(pricing_id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -671,6 +796,27 @@ def api_update_user_preferences(data: UserPreferencesUpdate, authorization: str 
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
     return update_preferences(user_id, data.preferences)
+
+
+# ============================================
+# References API
+# ============================================
+
+@app.get("/api/references")
+def api_list_references(
+    hook_type: Optional[str] = None,
+    selling_point: Optional[str] = None,
+    script_type: Optional[str] = None,
+    advertiser: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0
+):
+    return list_references(hook_type, selling_point, script_type, advertiser, limit, offset)
+
+
+@app.get("/api/references/filters")
+def api_get_reference_filters():
+    return get_reference_filters()
 
 
 # ============================================

@@ -9,6 +9,7 @@ import { CopyGenerator } from '@/pages/CopyGenerator';
 import { Checklist } from '@/pages/Checklist';
 import { BestCopies } from '@/pages/BestCopies';
 import Analytics from '@/pages/Analytics';
+import References from '@/pages/References';
 import { Toaster } from '@/components/ui/sonner';
 import Login from '@/pages/Login';
 import Register from '@/pages/Register';
@@ -63,6 +64,12 @@ export default function App() {
           <Route path="/analytics" element={
             <ProtectedRoute>
               <MainLayout><Analytics /></MainLayout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/references" element={
+            <ProtectedRoute>
+              <MainLayout><References /></MainLayout>
             </ProtectedRoute>
           } />
 

@@ -25,6 +25,14 @@ import type {
   WeeklyTeamPerformance,
   AuditLog,
   UserPreferences,
+  ReferenceScript,
+  ReferenceFilters,
+  ProductSellingPoint,
+  ProductSellingPointCreate,
+  ProductAsset,
+  ProductAssetCreate,
+  ProductPricing,
+  ProductPricingCreate,
 } from '@/types';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -203,4 +211,52 @@ export const userPreferencesApi = {
       method: 'PUT',
       body: JSON.stringify({ preferences }),
     }),
+};
+
+// Product Selling Points API
+export const sellingPointsApi = {
+  list: (productId: string) => fetchAPI<ProductSellingPoint[]>(`/api/products/${productId}/selling-points`),
+  create: (productId: string, data: ProductSellingPointCreate) =>
+    fetchAPI<ProductSellingPoint>(`/api/products/${productId}/selling-points`, { method: 'POST', body: JSON.stringify(data) }),
+  update: (productId: string, spId: string, data: Partial<ProductSellingPointCreate>) =>
+    fetchAPI<ProductSellingPoint>(`/api/products/${productId}/selling-points/${spId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (productId: string, spId: string) =>
+    fetchAPI<void>(`/api/products/${productId}/selling-points/${spId}`, { method: 'DELETE' }),
+};
+
+// Product Assets API
+export const assetsApi = {
+  list: (productId: string) => fetchAPI<ProductAsset[]>(`/api/products/${productId}/assets`),
+  create: (productId: string, data: ProductAssetCreate) =>
+    fetchAPI<ProductAsset>(`/api/products/${productId}/assets`, { method: 'POST', body: JSON.stringify(data) }),
+  update: (productId: string, assetId: string, data: Partial<ProductAssetCreate>) =>
+    fetchAPI<ProductAsset>(`/api/products/${productId}/assets/${assetId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (productId: string, assetId: string) =>
+    fetchAPI<void>(`/api/products/${productId}/assets/${assetId}`, { method: 'DELETE' }),
+};
+
+// Product Pricing API
+export const pricingApi = {
+  list: (productId: string) => fetchAPI<ProductPricing[]>(`/api/products/${productId}/pricing`),
+  create: (productId: string, data: ProductPricingCreate) =>
+    fetchAPI<ProductPricing>(`/api/products/${productId}/pricing`, { method: 'POST', body: JSON.stringify(data) }),
+  update: (productId: string, pricingId: string, data: Partial<ProductPricingCreate>) =>
+    fetchAPI<ProductPricing>(`/api/products/${productId}/pricing/${pricingId}`, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (productId: string, pricingId: string) =>
+    fetchAPI<void>(`/api/products/${productId}/pricing/${pricingId}`, { method: 'DELETE' }),
+};
+
+// References API
+export const referencesApi = {
+  list: (params?: { hook_type?: string; selling_point?: string; script_type?: string; advertiser?: string; limit?: number; offset?: number }) => {
+    const p = new URLSearchParams();
+    if (params?.hook_type) p.append('hook_type', params.hook_type);
+    if (params?.selling_point) p.append('selling_point', params.selling_point);
+    if (params?.script_type) p.append('script_type', params.script_type);
+    if (params?.advertiser) p.append('advertiser', params.advertiser);
+    if (params?.limit) p.append('limit', String(params.limit));
+    if (params?.offset) p.append('offset', String(params.offset));
+    return fetchAPI<ReferenceScript[]>(`/api/references?${p}`);
+  },
+  filters: () => fetchAPI<ReferenceFilters>('/api/references/filters'),
 };
