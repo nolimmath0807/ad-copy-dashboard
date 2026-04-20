@@ -142,7 +142,7 @@ export default function References() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_VALUE}>전체</SelectItem>
-                {filters.hook_types.map((v) => (
+                {filters.hook_types.filter(v => v !== '').map((v) => (
                   <SelectItem key={v} value={v}>{v}</SelectItem>
                 ))}
               </SelectContent>
@@ -157,7 +157,7 @@ export default function References() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_VALUE}>전체</SelectItem>
-                {filters.selling_points.map((v) => (
+                {filters.selling_points.filter(v => v !== '').map((v) => (
                   <SelectItem key={v} value={v}>{v}</SelectItem>
                 ))}
               </SelectContent>
@@ -172,7 +172,7 @@ export default function References() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_VALUE}>전체</SelectItem>
-                {filters.script_types.map((v) => (
+                {filters.script_types.filter(v => v !== '').map((v) => (
                   <SelectItem key={v} value={v}>{v}</SelectItem>
                 ))}
               </SelectContent>
@@ -187,7 +187,7 @@ export default function References() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_VALUE}>전체</SelectItem>
-                {filters.advertisers.map((v) => (
+                {filters.advertisers.filter(v => v !== '').map((v) => (
                   <SelectItem key={v} value={v}>{v}</SelectItem>
                 ))}
               </SelectContent>
